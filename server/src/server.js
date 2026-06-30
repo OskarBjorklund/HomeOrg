@@ -1,5 +1,7 @@
 // server/src/server.js
 
+console.log("Server.js started");
+
 const http = require("http");
 const { Server } = require("socket.io");
 const app = require("./app");
@@ -32,4 +34,5 @@ async function startServer() {
     }
 }
 
+console.log("About to listen...");
 startServer();

@@ -1,6 +1,8 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const authRoutes = require("./modules/auth/routes");
+const authRoutes = require("./features/auth/routes");
+const householdRoutes = require("./features/households/routes");
+const choreRoutes = require("./features/chores/routes");
 const { attachUser } = require("./middleware/auth");
 
 
