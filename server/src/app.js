@@ -15,6 +15,7 @@ app.use(cookieParser());
 app.use(attachUser);
 
 app.use("/api/auth", authRoutes);
+app.use("/api/households", householdRoutes);
 
 app.get("/api/status", (req, res) => {
     res.json({
