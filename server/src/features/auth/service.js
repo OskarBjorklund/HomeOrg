@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const authModel = require("./model");
+const ApiError = require("../../errors/ApiError");
 const sessionManager = require("../../sessions/sessionManager");
 
 const SALT_ROUNDS = 10;

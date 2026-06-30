@@ -1,4 +1,5 @@
-const authService = require("./service");
+const service = require("./service");
+const response = require("../../utils/response");
 const {
     setSessionCookie,
     clearSessionCookie,
@@ -6,95 +7,87 @@ const {
 } = require("../../middleware/auth");
 
 async function register(req, res) {
-    try {
-        const { username, password, displayName } = req.body;
+    const { username, password, displayName } = req.body;
 
-        const result = await authService.register({
-            username,
-            password,
-            displayName
-        });
+    const result = await service.register({
+        username,
+        password,
+        displayName
+    });
 
-        setSessionCookie(res, result.session.id);
+    setSessionCookie(res, result.session.id);
 
-        return res.status(201).json({
-            ok: true,
-            message: "User registered",
-            user: result.user
-        });
-    } catch (error) {
-        return res.status(400).json({
-            ok: false,
-            message: error.message
-        });
-    }
+    return response.success(
+        res,
+        { user: result.user },
+        "User registered",
+        201
+    );
 }
 
 async function login(req, res) {
-    try {
-        const { username, password } = req.body;
+    const { username, password } = req.body;
 
-        const result = await authService.login({
-            username,
-            password
-        });
+    const result = await service.login({
+        username,
+        password
+    });
 
-        setSessionCookie(res, result.session.id);
+    setSessionCookie(res, result.session.id);
 
-        return res.json({
-            ok: true,
-            message: "Logged in",
-            user: result.user
-        });
-    } catch (error) {
-        return res.status(401).json({
-            ok: false,
-            message: error.message
-        });
-    }
+    return response.success(
+        res,
+        { user: result.user },
+        "Logged in"
+    );
 }
 
 async function logout(req, res) {
     const sessionId = getSessionIdFromRequest(req);
 
     if (sessionId) {
-        await authService.logout(sessionId);
+        await service.logout(sessionId);
     }
 
     clearSessionCookie(res);
 
-    return res.json({
-        ok: true,
-        message: "Logged out"
-    });
+    return response.success(
+        res,
+        null,
+        "Logged out"
+    );
 }
 
 async function logoutAll(req, res) {
-    await authService.logoutAll(req.user.id);
+    await service.logoutAll(req.user.id);
+
     clearSessionCookie(res);
 
-    return res.json({
-        ok: true,
-        message: "Logged out from all sessions"
-    });
+    return response.success(
+        res,
+        null,
+        "Logged out from all sessions"
+    );
 }
 
 async function logoutOthers(req, res) {
     const sessionId = getSessionIdFromRequest(req);
 
-    await authService.logoutOthers(req.user.id, sessionId);
+    await service.logoutOthers(req.user.id, sessionId);
 
-    return res.json({
-        ok: true,
-        message: "Other sessions logged out"
-    });
+    return response.success(
+        res,
+        null,
+        "Other sessions logged out"
+    );
 }
 
 async function me(req, res) {
-    return res.json({
-        ok: true,
-        user: req.user || null
-    });
+    return response.success(
+        res,
+        { user: req.user || null },
+        "Current user"
+    );
 }
 
 module.exports = {

@@ -1,9 +1,10 @@
 const crypto = require("crypto");
 const model = require("./model");
 const sessionManager = require("../../sessions/sessionManager");
+const ApiError = require("../../errors/ApiError");
 const { Roles, InviteLength, InviteLifetimeDays } = require("./constants");
 
-function generateInviteCode(InviteLength) {
+function generateInviteCode(length = InviteLength) {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
 
@@ -16,7 +17,7 @@ function generateInviteCode(InviteLength) {
 
 async function createHousehold(userId, { name, description }) {
     if (!name || !name.trim()) {
-        throw new Error("Household name is required.");
+        throw new ApiError(400, "Household name is required.");
     }
 
     const household = await model.createHousehold({
@@ -56,7 +57,7 @@ async function selectHousehold(sessionId, userId, householdId) {
     });
 
     if (!member) {
-        throw new Error("You are not a member of this household.");
+        throw new ApiError(403, "You are not a member of this household.");
     }
 
     await sessionManager.setHousehold(sessionId, householdId);
@@ -69,11 +70,11 @@ async function createInvite(userId, householdId, role = Roles.MEMBER) {
     });
 
     if (!member) {
-        throw new Error("You are not a member of this household.");
+        throw new ApiError(403, "You are not a member of this household.");
     }
 
     if (![Roles.OWNER, Roles.ADMIN].includes(member.role)) {
-        throw new Error("Only owners and admins can create invites.");
+        throw new ApiError(403, "Only owners and admins can create invites.");
     }
 
     const inviteCode = generateInviteCode();
@@ -105,18 +106,18 @@ async function joinHousehold(userId, inviteCode) {
     const invite = await model.getInviteByCode(inviteCode);
 
     if (!invite) {
-        throw new Error("Invalid invite code.");
+        throw new ApiError(404, "Invalid invite code.");
     }
 
     if (invite.used_at) {
-        throw new Error("Invite has already been used.");
+        throw new ApiError(403, "Invite has already been used.");
     }
 
     if (
         invite.expires_at &&
         new Date(invite.expires_at) < new Date()
     ) {
-        throw new Error("Invite has expired.");
+        throw new ApiError(403, "Invite has expired.");
     }
 
     const existingMember = await model.getMember({
@@ -125,7 +126,7 @@ async function joinHousehold(userId, inviteCode) {
     });
 
     if (existingMember) {
-        throw new Error("User is already a member.");
+        throw new ApiError(403, "User is already a member.");
     }
 
     await model.addMember({
@@ -143,7 +144,7 @@ async function joinHousehold(userId, inviteCode) {
         householdId: invite.household_id,
         actorUserId: userId,
         action: "MEMBER_JOINED",
-        entityType: Roles.MEMBER,
+        entityType: "member",
         entityId: userId,
         message: "A new member joined the household."
     });
