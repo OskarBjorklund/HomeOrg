@@ -4,6 +4,9 @@ DROP TABLE IF EXISTS shop_purchases;
 DROP TABLE IF EXISTS shop_items;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS points_ledger;
+
+DROP TABLE IF EXISTS chore_template_tags;
+DROP TABLE IF EXISTS chore_tags;
 DROP TABLE IF EXISTS chore_assignments;
 DROP TABLE IF EXISTS chore_instances;
 DROP TABLE IF EXISTS chores;
@@ -59,6 +62,7 @@ CREATE TABLE household_members (
 
     is_active INTEGER NOT NULL DEFAULT 1,
     joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (household_id, user_id),
 
@@ -166,18 +170,32 @@ CREATE TABLE sessions (
 CREATE TABLE chores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
+
     title TEXT NOT NULL,
     description TEXT,
+
     category TEXT,
+    icon TEXT,
+    color TEXT,
+
     points INTEGER NOT NULL DEFAULT 10,
+    difficulty TEXT,
+    estimated_minutes INTEGER,
 
     recurrence_type TEXT NOT NULL DEFAULT 'none',
     recurrence_interval INTEGER NOT NULL DEFAULT 1,
 
+    priority TEXT NOT NULL DEFAULT 'normal',
     assignment_mode TEXT NOT NULL DEFAULT 'unassigned',
+
+    visible_to_children INTEGER NOT NULL DEFAULT 1,
+    requires_approval INTEGER NOT NULL DEFAULT 0,
+
     created_by_user_id INTEGER NOT NULL,
 
     is_active INTEGER NOT NULL DEFAULT 1,
+    is_archived INTEGER NOT NULL DEFAULT 0,
+
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -195,15 +213,36 @@ CREATE TABLE chore_instances (
     chore_id INTEGER NOT NULL,
     household_id INTEGER NOT NULL,
 
+    title TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    icon TEXT,
+    color TEXT,
+
+    points INTEGER NOT NULL DEFAULT 10,
+    difficulty TEXT,
+    estimated_minutes INTEGER,
+    priority TEXT NOT NULL DEFAULT 'normal',
+    requires_approval INTEGER NOT NULL DEFAULT 0,
+
     due_date TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'open',
 
-    assigned_to_user_id INTEGER,
-    claimed_by_user_id INTEGER,
-    completed_by_user_id INTEGER,
+    assigned_to_member_id INTEGER,
+    claimed_by_member_id INTEGER,
+    completed_by_member_id INTEGER,
 
     completed_at TEXT,
+
+    approved_by_member_id INTEGER,
+    approved_at TEXT,
+
+    rejected_by_member_id INTEGER,
+    rejected_at TEXT,
+    rejection_reason TEXT,
+
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (chore_id)
         REFERENCES chores(id)
@@ -213,39 +252,79 @@ CREATE TABLE chore_instances (
         REFERENCES households(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (assigned_to_user_id)
-        REFERENCES users(id)
+    FOREIGN KEY (assigned_to_member_id)
+        REFERENCES household_members(id)
         ON DELETE SET NULL,
 
-    FOREIGN KEY (claimed_by_user_id)
-        REFERENCES users(id)
+    FOREIGN KEY (claimed_by_member_id)
+        REFERENCES household_members(id)
         ON DELETE SET NULL,
 
-    FOREIGN KEY (completed_by_user_id)
-        REFERENCES users(id)
+    FOREIGN KEY (completed_by_member_id)
+        REFERENCES household_members(id)
+        ON DELETE SET NULL,
+
+    FOREIGN KEY (approved_by_member_id)
+        REFERENCES household_members(id)
+        ON DELETE SET NULL,
+
+    FOREIGN KEY (rejected_by_member_id)
+        REFERENCES household_members(id)
         ON DELETE SET NULL
 );
 
 CREATE TABLE chore_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chore_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
+    household_member_id INTEGER NOT NULL,
 
-    UNIQUE (chore_id, user_id),
+    UNIQUE (chore_id, household_member_id),
 
     FOREIGN KEY (chore_id)
         REFERENCES chores(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (user_id)
-        REFERENCES users(id)
+    FOREIGN KEY (household_member_id)
+        REFERENCES household_members(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE chore_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    household_id INTEGER NOT NULL,
+
+    name TEXT NOT NULL,
+    color TEXT,
+
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (household_id, name),
+
+    FOREIGN KEY (household_id)
+        REFERENCES households(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE chore_template_tags (
+    chore_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+
+    PRIMARY KEY (chore_id, tag_id),
+
+    FOREIGN KEY (chore_id)
+        REFERENCES chores(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (tag_id)
+        REFERENCES chore_tags(id)
         ON DELETE CASCADE
 );
 
 CREATE TABLE points_ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
+    household_member_id INTEGER NOT NULL,
 
     amount INTEGER NOT NULL,
     reason TEXT NOT NULL,
@@ -259,12 +338,16 @@ CREATE TABLE points_ledger (
         REFERENCES households(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (user_id)
-        REFERENCES users(id)
+    FOREIGN KEY (household_member_id)
+        REFERENCES household_members(id)
         ON DELETE CASCADE,
 
     FOREIGN KEY (chore_instance_id)
         REFERENCES chore_instances(id)
+        ON DELETE SET NULL,
+
+    FOREIGN KEY (shop_purchase_id)
+        REFERENCES shop_purchases(id)
         ON DELETE SET NULL
 );
 
@@ -278,7 +361,9 @@ CREATE TABLE shop_items (
     created_by_user_id INTEGER NOT NULL,
 
     is_active INTEGER NOT NULL DEFAULT 1,
+
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (household_id)
         REFERENCES households(id)
@@ -293,13 +378,15 @@ CREATE TABLE shop_purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     shop_item_id INTEGER NOT NULL,
     household_id INTEGER NOT NULL,
-    buyer_user_id INTEGER NOT NULL,
+    buyer_member_id INTEGER NOT NULL,
 
     cost INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
 
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     approved_at TEXT,
+    approved_by_member_id INTEGER,
 
     FOREIGN KEY (shop_item_id)
         REFERENCES shop_items(id)
@@ -309,15 +396,19 @@ CREATE TABLE shop_purchases (
         REFERENCES households(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (buyer_user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (buyer_member_id)
+        REFERENCES household_members(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (approved_by_member_id)
+        REFERENCES household_members(id)
+        ON DELETE SET NULL
 );
 
 CREATE TABLE notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
-    user_id INTEGER,
+    household_member_id INTEGER,
 
     type TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -325,18 +416,22 @@ CREATE TABLE notifications (
     is_read INTEGER NOT NULL DEFAULT 0,
 
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (household_id)
         REFERENCES households(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (user_id)
-        REFERENCES users(id)
+    FOREIGN KEY (household_member_id)
+        REFERENCES household_members(id)
         ON DELETE CASCADE
 );
 
 CREATE INDEX idx_sessions_user_id
 ON sessions(user_id);
+
+CREATE INDEX idx_sessions_household_id
+ON sessions(household_id);
 
 CREATE INDEX idx_household_members_household_id
 ON household_members(household_id);
@@ -344,23 +439,71 @@ ON household_members(household_id);
 CREATE INDEX idx_household_members_user_id
 ON household_members(user_id);
 
+CREATE INDEX idx_household_members_household_user
+ON household_members(household_id, user_id);
+
 CREATE INDEX idx_household_invites_code
 ON household_invites(invite_code);
+
+CREATE INDEX idx_household_invites_household_id
+ON household_invites(household_id);
 
 CREATE INDEX idx_household_activity_log_household_id
 ON household_activity_log(household_id);
 
+CREATE INDEX idx_household_activity_log_entity
+ON household_activity_log(entity_type, entity_id);
+
 CREATE INDEX idx_chores_household_id
 ON chores(household_id);
+
+CREATE INDEX idx_chores_household_active_archived
+ON chores(household_id, is_active, is_archived);
+
+CREATE INDEX idx_chore_instances_chore_id
+ON chore_instances(chore_id);
 
 CREATE INDEX idx_chore_instances_household_due_date
 ON chore_instances(household_id, due_date);
 
+CREATE INDEX idx_chore_instances_household_status_due_date
+ON chore_instances(household_id, status, due_date);
+
 CREATE INDEX idx_chore_instances_status
 ON chore_instances(status);
 
-CREATE INDEX idx_points_ledger_user_id
-ON points_ledger(user_id);
+CREATE INDEX idx_chore_instances_assigned_to_member_id
+ON chore_instances(assigned_to_member_id);
 
-CREATE INDEX idx_notifications_user_id
-ON notifications(user_id);
+CREATE INDEX idx_chore_assignments_chore_id
+ON chore_assignments(chore_id);
+
+CREATE INDEX idx_chore_assignments_household_member_id
+ON chore_assignments(household_member_id);
+
+CREATE INDEX idx_chore_tags_household_id
+ON chore_tags(household_id);
+
+CREATE INDEX idx_points_ledger_household_id
+ON points_ledger(household_id);
+
+CREATE INDEX idx_points_ledger_household_member_id
+ON points_ledger(household_member_id);
+
+CREATE INDEX idx_points_ledger_chore_instance_id
+ON points_ledger(chore_instance_id);
+
+CREATE INDEX idx_shop_items_household_id
+ON shop_items(household_id);
+
+CREATE INDEX idx_shop_purchases_household_id
+ON shop_purchases(household_id);
+
+CREATE INDEX idx_shop_purchases_buyer_member_id
+ON shop_purchases(buyer_member_id);
+
+CREATE INDEX idx_notifications_household_member_id
+ON notifications(household_member_id);
+
+CREATE INDEX idx_notifications_household_member_read
+ON notifications(household_id, household_member_id, is_read);
