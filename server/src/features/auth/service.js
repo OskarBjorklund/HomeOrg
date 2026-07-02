@@ -1,19 +1,18 @@
 const bcrypt = require("bcrypt");
 const authModel = require("./model");
+const validation = require("./validation");
 const ApiError = require("../../errors/ApiError");
 const sessionManager = require("../../sessions/sessionManager");
 
 const SALT_ROUNDS = 10;
 
-async function register({ username, password, displayName }) {
-    if (!username || !password || !displayName) {
-        throw new Error("Username, password, and display name are required");
-    }
+async function register(body) {
+    const { username, password, displayName } = validation.validateRegister(body);
 
     const existingUser = await authModel.findUserByUsername(username);
 
     if (existingUser) {
-        throw new Error("Username already exists");
+        throw new ApiError(409, "Username already exists.");
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -29,21 +28,19 @@ async function register({ username, password, displayName }) {
     return { user, session };
 }
 
-async function login({ username, password }) {
-    if (!username || !password) {
-        throw new Error("Username and password are required");
-    }
+async function login(body) {
+    const { username, password } = validation.validateLogin(body);
 
     const user = await authModel.findUserByUsername(username);
 
     if (!user) {
-        throw new Error("Invalid username or password");
+        throw new ApiError(401, "Invalid username or password.");
     }
 
     const passwordIsValid = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordIsValid) {
-        throw new Error("Invalid username or password");
+        throw new ApiError(401, "Invalid username or password.");
     }
 
     const session = await sessionManager.createSession(user.id);

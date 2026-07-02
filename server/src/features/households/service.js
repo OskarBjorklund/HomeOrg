@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const model = require("./model");
+const validation = require("./validation");
 const sessionManager = require("../../sessions/sessionManager");
 const ApiError = require("../../errors/ApiError");
 const { Roles, InviteLength, InviteLifetimeDays } = require("./constants");
@@ -9,20 +10,18 @@ function generateInviteCode(length = InviteLength) {
     let code = "";
 
     for (let i = 0; i < length; i++) {
-        code += chars[Math.floor(Math.random() * chars.length)];
+        code += chars[crypto.randomInt(chars.length)];
     }
 
     return code;
 }
 
-async function createHousehold(userId, { name, description }) {
-    if (!name || !name.trim()) {
-        throw new ApiError(400, "Household name is required.");
-    }
+async function createHousehold(userId, body) {
+    const { name, description } = validation.validateCreateHousehold(body);
 
     const household = await model.createHousehold({
-        name: name.trim(),
-        description: description?.trim() || null,
+        name,
+        description,
         createdByUserId: userId
     });
 
@@ -50,7 +49,9 @@ async function getMyHouseholds(userId) {
     return model.getHouseholdsForUser(userId);
 }
 
-async function selectHousehold(sessionId, userId, householdId) {
+async function selectHousehold(sessionId, userId, body) {
+    const { householdId } = validation.validateSelectHousehold(body);
+
     const member = await model.getMember({
         householdId,
         userId
@@ -61,9 +62,13 @@ async function selectHousehold(sessionId, userId, householdId) {
     }
 
     await sessionManager.setHousehold(sessionId, householdId);
+
+    return { householdId };
 }
 
-async function createInvite(userId, householdId, role = Roles.MEMBER) {
+async function createInvite(userId, body) {
+    const { householdId, role } = validation.validateCreateInvite(body);
+
     const member = await model.getMember({
         householdId,
         userId
@@ -102,7 +107,9 @@ async function createInvite(userId, householdId, role = Roles.MEMBER) {
     return invite;
 }
 
-async function joinHousehold(userId, inviteCode) {
+async function joinHousehold(userId, body) {
+    const { inviteCode } = validation.validateJoinHousehold(body);
+
     const invite = await model.getInviteByCode(inviteCode);
 
     if (!invite) {

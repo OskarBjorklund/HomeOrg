@@ -24,12 +24,11 @@ async function getMyHouseholds(req, res) {
 
 async function selectHousehold(req, res) {
     const sessionId = getSessionIdFromRequest(req);
-    const { householdId } = req.body;
 
-    await service.selectHousehold(
+    const { householdId } = await service.selectHousehold(
         sessionId,
         req.user.id,
-        Number(householdId)
+        req.body
     );
 
     return response.success(
@@ -40,13 +39,7 @@ async function selectHousehold(req, res) {
 }
 
 async function createInvite(req, res) {
-    const { householdId, role } = req.body;
-
-    const invite = await service.createInvite(
-        req.user.id,
-        Number(householdId),
-        role
-    );
+    const invite = await service.createInvite(req.user.id, req.body);
 
     return response.success(
         res,
@@ -57,9 +50,7 @@ async function createInvite(req, res) {
 }
 
 async function joinHousehold(req, res) {
-    const { inviteCode } = req.body;
-
-    await service.joinHousehold(req.user.id, inviteCode);
+    await service.joinHousehold(req.user.id, req.body);
 
     return response.success(
         res,

@@ -1,4 +1,5 @@
 const sessionManager = require("../sessions/sessionManager");
+const householdsModel = require("../features/households/model");
 
 const SESSION_COOKIE_NAME = "homeorg_session";
 
@@ -52,15 +53,40 @@ function requireAuth(req, res, next) {
     return next();
 }
 
-function requireHousehold(req, res, next) {
-    if (!req.user?.householdId) {
-        return res.status(403).json({
-            ok: false,
-            message: "No active household selected"
-        });
-    }
+async function requireHousehold(req, res, next) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                ok: false,
+                message: "Not authenticated"
+            });
+        }
 
-    return next();
+        if (!req.user.householdId) {
+            return res.status(403).json({
+                ok: false,
+                message: "No active household selected"
+            });
+        }
+
+        const member = await householdsModel.getMember({
+            householdId: req.user.householdId,
+            userId: req.user.id
+        });
+
+        if (!member) {
+            return res.status(403).json({
+                ok: false,
+                message: "You are not a member of this household."
+            });
+        }
+
+        req.member = member;
+
+        return next();
+    } catch (error) {
+        return next(error);
+    }
 }
 
 function setSessionCookie(res, sessionId) {

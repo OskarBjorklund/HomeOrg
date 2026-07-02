@@ -16,6 +16,7 @@ app.use(attachUser);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/households", householdRoutes);
+app.use("/api/chores", choreRoutes);
 
 
 app.get("/api/status", (req, res) => {

@@ -7,13 +7,7 @@ const {
 } = require("../../middleware/auth");
 
 async function register(req, res) {
-    const { username, password, displayName } = req.body;
-
-    const result = await service.register({
-        username,
-        password,
-        displayName
-    });
+    const result = await service.register(req.body);
 
     setSessionCookie(res, result.session.id);
 
@@ -26,12 +20,7 @@ async function register(req, res) {
 }
 
 async function login(req, res) {
-    const { username, password } = req.body;
-
-    const result = await service.login({
-        username,
-        password
-    });
+    const result = await service.login(req.body);
 
     setSessionCookie(res, result.session.id);
 
@@ -53,7 +42,7 @@ async function logout(req, res) {
 
     return response.success(
         res,
-        null,
+        {},
         "Logged out"
     );
 }
@@ -65,7 +54,7 @@ async function logoutAll(req, res) {
 
     return response.success(
         res,
-        null,
+        {},
         "Logged out from all sessions"
     );
 }
@@ -77,7 +66,7 @@ async function logoutOthers(req, res) {
 
     return response.success(
         res,
-        null,
+        {},
         "Other sessions logged out"
     );
 }

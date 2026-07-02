@@ -1,5 +1,5 @@
 const { getDatabase } = require("../../database/database");
-const { Roles, InviteLength, InviteLifetimeDays } = require("./constants");
+const { Roles } = require("./constants");
 
 async function createHousehold({ name, description, createdByUserId }) {
     const db = getDatabase();
