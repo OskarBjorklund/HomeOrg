@@ -118,9 +118,45 @@ function stepDate(date, chore) {
     return date.add(interval, "month");
 }
 
+// Var börjar recurrence-mönstret? Ett steg efter senaste instansen t.o.m. idag;
+// finns ingen sådan startar mönstret idag. Framtida instanser påverkar inte
+// fasen — det gör att generering/projektion självläker luckor.
+async function getOccurrenceStartDate(chore, today) {
+    const anchor = await model.getLastInstanceOnOrBefore(chore.id, today);
+
+    if (!anchor) {
+        return today;
+    }
+
+    return stepDate(dayjs(anchor.dueDate), chore).format(DATE_FORMAT);
+}
+
+// Rena mönster-datum i [from, to] utifrån ett startdatum. Enda källan till
+// sanning för recurrence — används av både generering (skapa instanser)
+// och kalendern (projicera kommande förekomster utan att skriva något).
+function computeOccurrenceDates(chore, { startDate, from, to }) {
+    const dates = [];
+
+    let candidate = dayjs(startDate);
+    let guard = 0;
+
+    while (candidate.isBefore(dayjs(from)) && guard < Limits.GENERATION_LOOP_CAP) {
+        candidate = stepDate(candidate, chore);
+        guard++;
+    }
+
+    while (!candidate.isAfter(dayjs(to)) && guard < Limits.GENERATION_LOOP_CAP) {
+        dates.push(candidate.format(DATE_FORMAT));
+        candidate = stepDate(candidate, chore);
+        guard++;
+    }
+
+    return dates;
+}
+
 // Genererar instanser för en återkommande chore fram till "until".
-// Ankare: senaste befintliga instansens due_date; annars startar vi idag.
-// Datum i det förflutna hoppas över (ingen retroaktiv skuld).
+// Datum i det förflutna hoppas över (ingen retroaktiv skuld) och
+// redan existerande (datum, medlem)-par dedupas.
 async function generateForChore(chore, { today, until }) {
     const existing = await model.getInstancesForChoreInRange(chore.id, today, until);
 
@@ -129,16 +165,8 @@ async function generateForChore(chore, { today, until }) {
         existing.map((row) => `${row.dueDate}:${row.assignedToMemberId}`)
     );
 
-    const last = await model.getLastInstanceForChore(chore.id);
-
-    let candidate = last ? stepDate(dayjs(last.dueDate), chore) : dayjs(today);
-    let guard = 0;
-
-    // Spola fram förbi passerade datum.
-    while (candidate.isBefore(dayjs(today)) && guard < Limits.GENERATION_LOOP_CAP) {
-        candidate = stepDate(candidate, chore);
-        guard++;
-    }
+    const startDate = await getOccurrenceStartDate(chore, today);
+    const dates = computeOccurrenceDates(chore, { startDate, from: today, to: until });
 
     const usesPool =
         chore.assignmentMode === AssignmentMode.SPECIFIC ||
@@ -157,9 +185,7 @@ async function generateForChore(chore, { today, until }) {
 
     let created = 0;
 
-    while (!candidate.isAfter(dayjs(until)) && guard < Limits.GENERATION_LOOP_CAP) {
-        const dueDate = candidate.format(DATE_FORMAT);
-
+    for (const dueDate of dates) {
         if (chore.assignmentMode === AssignmentMode.SPECIFIC && pool.length > 0) {
             // En instans per tilldelad medlem och datum.
             for (const memberId of pool) {
@@ -186,9 +212,6 @@ async function generateForChore(chore, { today, until }) {
             );
             created++;
         }
-
-        candidate = stepDate(candidate, chore);
-        guard++;
     }
 
     return created;
@@ -434,5 +457,10 @@ module.exports = {
     approveInstance,
     rejectInstance,
     updateInstance,
-    deleteInstance
+    deleteInstance,
+
+    // Delas med kalendern (projektion + materialisering).
+    getOccurrenceStartDate,
+    computeOccurrenceDates,
+    generateForChore
 };

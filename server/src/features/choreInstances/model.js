@@ -164,6 +164,23 @@ async function getLastInstanceForChore(choreId) {
     );
 }
 
+// Ankare för recurrence-mönstret: senaste instansen t.o.m. ett visst datum.
+// Framtida (materialiserade) instanser ignoreras så att mönstrets fas
+// alltid utgår från senaste faktiska förekomsten.
+async function getLastInstanceOnOrBefore(choreId, date) {
+    const db = getDatabase();
+
+    return db.get(
+        `SELECT due_date AS dueDate
+         FROM chore_instances
+         WHERE chore_id = ?
+         AND due_date <= ?
+         ORDER BY due_date DESC, id DESC
+         LIMIT 1`,
+        [choreId, date]
+    );
+}
+
 async function getLastAssignedInstanceForChore(choreId) {
     const db = getDatabase();
 
@@ -323,6 +340,7 @@ module.exports = {
     getInstancesForHousehold,
     getInstancesForChoreInRange,
     getLastInstanceForChore,
+    getLastInstanceOnOrBefore,
     getLastAssignedInstanceForChore,
     claimInstance,
     unclaimInstance,

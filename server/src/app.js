@@ -5,6 +5,7 @@ const householdRoutes = require("./features/households/routes");
 const choreRoutes = require("./features/chores/routes");
 const choreInstanceRoutes = require("./features/choreInstances/routes");
 const dashboardRoutes = require("./features/dashboard/routes");
+const calendarRoutes = require("./features/calendar/routes");
 const errorHandler = require("./middleware/errorHandler");
 const { attachUser } = require("./middleware/auth");
 
@@ -21,6 +22,7 @@ app.use("/api/households", householdRoutes);
 app.use("/api/chores", choreRoutes);
 app.use("/api/chore-instances", choreInstanceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/calendar", calendarRoutes);
 
 
 app.get("/api/status", (req, res) => {
