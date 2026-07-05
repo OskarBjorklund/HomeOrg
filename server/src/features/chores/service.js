@@ -1,6 +1,7 @@
 const model = require("./model");
 const validation = require("./validation");
 const ApiError = require("../../errors/ApiError");
+const { withTransaction } = require("../../database/database");
 const { AssignmentMode, ChoreManagerRoles } = require("./constants");
 
 function requireManager(member) {
@@ -56,28 +57,32 @@ async function createChore(context, body) {
         await assertMembersBelongToHousehold(member.household_id, data.assignedMemberIds);
     }
 
-    const chore = await model.createChore({
-        householdId: member.household_id,
-        createdByUserId: user.id,
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        icon: data.icon,
-        color: data.color,
-        points: data.points,
-        difficulty: data.difficulty,
-        estimatedMinutes: data.estimatedMinutes,
-        recurrenceType: data.recurrenceType,
-        recurrenceInterval: data.recurrenceInterval,
-        priority: data.priority,
-        assignmentMode: data.assignmentMode,
-        visibleToChildren: data.visibleToChildren,
-        requiresApproval: data.requiresApproval
-    });
+    const chore = await withTransaction(async () => {
+        const created = await model.createChore({
+            householdId: member.household_id,
+            createdByUserId: user.id,
+            title: data.title,
+            description: data.description,
+            category: data.category,
+            icon: data.icon,
+            color: data.color,
+            points: data.points,
+            difficulty: data.difficulty,
+            estimatedMinutes: data.estimatedMinutes,
+            recurrenceType: data.recurrenceType,
+            recurrenceInterval: data.recurrenceInterval,
+            priority: data.priority,
+            assignmentMode: data.assignmentMode,
+            visibleToChildren: data.visibleToChildren,
+            requiresApproval: data.requiresApproval
+        });
 
-    if (data.assignmentMode === AssignmentMode.SPECIFIC && data.assignedMemberIds) {
-        await model.replaceAssignments(chore.id, data.assignedMemberIds);
-    }
+        if (data.assignmentMode === AssignmentMode.SPECIFIC && data.assignedMemberIds) {
+            await model.replaceAssignments(created.id, data.assignedMemberIds);
+        }
+
+        return created;
+    });
 
     return withAssignments(chore);
 }
@@ -127,16 +132,20 @@ async function updateChore(context, choreId, body) {
         await assertMembersBelongToHousehold(member.household_id, assignedMemberIds);
     }
 
-    const chore = await model.updateChore(id, patch);
+    const chore = await withTransaction(async () => {
+        const updated = await model.updateChore(id, patch);
 
-    // Assignments gäller bara i läget "specific"; annars nollställs de.
-    if (effectiveMode === AssignmentMode.SPECIFIC) {
-        if (assignedMemberIds !== undefined) {
-            await model.replaceAssignments(id, assignedMemberIds);
+        // Assignments gäller bara i läget "specific"; annars nollställs de.
+        if (effectiveMode === AssignmentMode.SPECIFIC) {
+            if (assignedMemberIds !== undefined) {
+                await model.replaceAssignments(id, assignedMemberIds);
+            }
+        } else if (patch.assignmentMode !== undefined) {
+            await model.replaceAssignments(id, []);
         }
-    } else if (patch.assignmentMode !== undefined) {
-        await model.replaceAssignments(id, []);
-    }
+
+        return updated;
+    });
 
     return withAssignments(chore);
 }

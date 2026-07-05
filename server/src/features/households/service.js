@@ -3,6 +3,7 @@ const model = require("./model");
 const validation = require("./validation");
 const sessionManager = require("../../sessions/sessionManager");
 const ApiError = require("../../errors/ApiError");
+const { withTransaction } = require("../../database/database");
 const { Roles, InviteLength, InviteLifetimeDays } = require("./constants");
 
 function generateInviteCode(length = InviteLength) {
@@ -19,30 +20,32 @@ function generateInviteCode(length = InviteLength) {
 async function createHousehold(userId, body) {
     const { name, description } = validation.validateCreateHousehold(body);
 
-    const household = await model.createHousehold({
-        name,
-        description,
-        createdByUserId: userId
+    return withTransaction(async () => {
+        const household = await model.createHousehold({
+            name,
+            description,
+            createdByUserId: userId
+        });
+
+        await model.addMember({
+            householdId: household.id,
+            userId,
+            role: Roles.OWNER
+        });
+
+        await model.createDefaultSettings(household.id);
+
+        await model.logActivity({
+            householdId: household.id,
+            actorUserId: userId,
+            action: "HOUSEHOLD_CREATED",
+            entityType: "household",
+            entityId: household.id,
+            message: "Household created"
+        });
+
+        return household;
     });
-
-    await model.addMember({
-        householdId: household.id,
-        userId,
-        role: Roles.OWNER
-    });
-
-    await model.createDefaultSettings(household.id);
-
-    await model.logActivity({
-        householdId: household.id,
-        actorUserId: userId,
-        action: "HOUSEHOLD_CREATED",
-        entityType: "household",
-        entityId: household.id,
-        message: "Household created"
-    });
-
-    return household;
 }
 
 async function getMyHouseholds(userId) {
@@ -136,24 +139,26 @@ async function joinHousehold(userId, body) {
         throw new ApiError(403, "User is already a member.");
     }
 
-    await model.addMember({
-        householdId: invite.household_id,
-        userId,
-        role: invite.role
-    });
+    await withTransaction(async () => {
+        await model.addMember({
+            householdId: invite.household_id,
+            userId,
+            role: invite.role
+        });
 
-    await model.markInviteUsed({
-        inviteId: invite.id,
-        usedByUserId: userId
-    });
+        await model.markInviteUsed({
+            inviteId: invite.id,
+            usedByUserId: userId
+        });
 
-    await model.logActivity({
-        householdId: invite.household_id,
-        actorUserId: userId,
-        action: "MEMBER_JOINED",
-        entityType: "member",
-        entityId: userId,
-        message: "A new member joined the household."
+        await model.logActivity({
+            householdId: invite.household_id,
+            actorUserId: userId,
+            action: "MEMBER_JOINED",
+            entityType: "member",
+            entityId: userId,
+            message: "A new member joined the household."
+        });
     });
 }
 

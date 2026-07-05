@@ -1,25 +1,10 @@
+-- Detta schema är idempotent (CREATE TABLE IF NOT EXISTS) och körs vid varje
+-- serverstart utan att röra befintlig data. För att medvetet nollställa
+-- databasen, kör reset.sql (npm run db:reset) som droppar allt först.
+
 PRAGMA foreign_keys = ON;
 
-DROP TABLE IF EXISTS shop_purchases;
-DROP TABLE IF EXISTS shop_items;
-DROP TABLE IF EXISTS notifications;
-DROP TABLE IF EXISTS points_ledger;
-
-DROP TABLE IF EXISTS chore_template_tags;
-DROP TABLE IF EXISTS chore_tags;
-DROP TABLE IF EXISTS chore_assignments;
-DROP TABLE IF EXISTS chore_instances;
-DROP TABLE IF EXISTS chores;
-
-DROP TABLE IF EXISTS household_activity_log;
-DROP TABLE IF EXISTS household_invites;
-DROP TABLE IF EXISTS household_settings;
-DROP TABLE IF EXISTS household_members;
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS households;
-DROP TABLE IF EXISTS users;
-
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -30,7 +15,7 @@ CREATE TABLE users (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE households (
+CREATE TABLE IF NOT EXISTS households (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
@@ -44,7 +29,7 @@ CREATE TABLE households (
         ON DELETE CASCADE
 );
 
-CREATE TABLE household_members (
+CREATE TABLE IF NOT EXISTS household_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
     user_id INTEGER,
@@ -79,7 +64,7 @@ CREATE TABLE household_members (
         ON DELETE SET NULL
 );
 
-CREATE TABLE household_settings (
+CREATE TABLE IF NOT EXISTS household_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL UNIQUE,
 
@@ -100,7 +85,7 @@ CREATE TABLE household_settings (
         ON DELETE CASCADE
 );
 
-CREATE TABLE household_invites (
+CREATE TABLE IF NOT EXISTS household_invites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
 
@@ -127,7 +112,7 @@ CREATE TABLE household_invites (
         ON DELETE SET NULL
 );
 
-CREATE TABLE household_activity_log (
+CREATE TABLE IF NOT EXISTS household_activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
     actor_user_id INTEGER,
@@ -150,7 +135,7 @@ CREATE TABLE household_activity_log (
         ON DELETE SET NULL
 );
 
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
     household_id INTEGER,
@@ -167,7 +152,7 @@ CREATE TABLE sessions (
         ON DELETE SET NULL
 );
 
-CREATE TABLE chores (
+CREATE TABLE IF NOT EXISTS chores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
 
@@ -208,7 +193,7 @@ CREATE TABLE chores (
         ON DELETE CASCADE
 );
 
-CREATE TABLE chore_instances (
+CREATE TABLE IF NOT EXISTS chore_instances (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chore_id INTEGER NOT NULL,
     household_id INTEGER NOT NULL,
@@ -273,7 +258,7 @@ CREATE TABLE chore_instances (
         ON DELETE SET NULL
 );
 
-CREATE TABLE chore_assignments (
+CREATE TABLE IF NOT EXISTS chore_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chore_id INTEGER NOT NULL,
     household_member_id INTEGER NOT NULL,
@@ -289,7 +274,7 @@ CREATE TABLE chore_assignments (
         ON DELETE CASCADE
 );
 
-CREATE TABLE chore_tags (
+CREATE TABLE IF NOT EXISTS chore_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
 
@@ -306,7 +291,7 @@ CREATE TABLE chore_tags (
         ON DELETE CASCADE
 );
 
-CREATE TABLE chore_template_tags (
+CREATE TABLE IF NOT EXISTS chore_template_tags (
     chore_id INTEGER NOT NULL,
     tag_id INTEGER NOT NULL,
 
@@ -321,7 +306,7 @@ CREATE TABLE chore_template_tags (
         ON DELETE CASCADE
 );
 
-CREATE TABLE points_ledger (
+CREATE TABLE IF NOT EXISTS points_ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
     household_member_id INTEGER NOT NULL,
@@ -351,7 +336,7 @@ CREATE TABLE points_ledger (
         ON DELETE SET NULL
 );
 
-CREATE TABLE shop_items (
+CREATE TABLE IF NOT EXISTS shop_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
 
@@ -374,7 +359,7 @@ CREATE TABLE shop_items (
         ON DELETE CASCADE
 );
 
-CREATE TABLE shop_purchases (
+CREATE TABLE IF NOT EXISTS shop_purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     shop_item_id INTEGER NOT NULL,
     household_id INTEGER NOT NULL,
@@ -405,7 +390,7 @@ CREATE TABLE shop_purchases (
         ON DELETE SET NULL
 );
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
     household_member_id INTEGER,
@@ -427,83 +412,83 @@ CREATE TABLE notifications (
         ON DELETE CASCADE
 );
 
-CREATE INDEX idx_sessions_user_id
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id
 ON sessions(user_id);
 
-CREATE INDEX idx_sessions_household_id
+CREATE INDEX IF NOT EXISTS idx_sessions_household_id
 ON sessions(household_id);
 
-CREATE INDEX idx_household_members_household_id
+CREATE INDEX IF NOT EXISTS idx_household_members_household_id
 ON household_members(household_id);
 
-CREATE INDEX idx_household_members_user_id
+CREATE INDEX IF NOT EXISTS idx_household_members_user_id
 ON household_members(user_id);
 
-CREATE INDEX idx_household_members_household_user
+CREATE INDEX IF NOT EXISTS idx_household_members_household_user
 ON household_members(household_id, user_id);
 
-CREATE INDEX idx_household_invites_code
+CREATE INDEX IF NOT EXISTS idx_household_invites_code
 ON household_invites(invite_code);
 
-CREATE INDEX idx_household_invites_household_id
+CREATE INDEX IF NOT EXISTS idx_household_invites_household_id
 ON household_invites(household_id);
 
-CREATE INDEX idx_household_activity_log_household_id
+CREATE INDEX IF NOT EXISTS idx_household_activity_log_household_id
 ON household_activity_log(household_id);
 
-CREATE INDEX idx_household_activity_log_entity
+CREATE INDEX IF NOT EXISTS idx_household_activity_log_entity
 ON household_activity_log(entity_type, entity_id);
 
-CREATE INDEX idx_chores_household_id
+CREATE INDEX IF NOT EXISTS idx_chores_household_id
 ON chores(household_id);
 
-CREATE INDEX idx_chores_household_active_archived
+CREATE INDEX IF NOT EXISTS idx_chores_household_active_archived
 ON chores(household_id, is_active, is_archived);
 
-CREATE INDEX idx_chore_instances_chore_id
+CREATE INDEX IF NOT EXISTS idx_chore_instances_chore_id
 ON chore_instances(chore_id);
 
-CREATE INDEX idx_chore_instances_household_due_date
+CREATE INDEX IF NOT EXISTS idx_chore_instances_household_due_date
 ON chore_instances(household_id, due_date);
 
-CREATE INDEX idx_chore_instances_household_status_due_date
+CREATE INDEX IF NOT EXISTS idx_chore_instances_household_status_due_date
 ON chore_instances(household_id, status, due_date);
 
-CREATE INDEX idx_chore_instances_status
+CREATE INDEX IF NOT EXISTS idx_chore_instances_status
 ON chore_instances(status);
 
-CREATE INDEX idx_chore_instances_assigned_to_member_id
+CREATE INDEX IF NOT EXISTS idx_chore_instances_assigned_to_member_id
 ON chore_instances(assigned_to_member_id);
 
-CREATE INDEX idx_chore_assignments_chore_id
+CREATE INDEX IF NOT EXISTS idx_chore_assignments_chore_id
 ON chore_assignments(chore_id);
 
-CREATE INDEX idx_chore_assignments_household_member_id
+CREATE INDEX IF NOT EXISTS idx_chore_assignments_household_member_id
 ON chore_assignments(household_member_id);
 
-CREATE INDEX idx_chore_tags_household_id
+CREATE INDEX IF NOT EXISTS idx_chore_tags_household_id
 ON chore_tags(household_id);
 
-CREATE INDEX idx_points_ledger_household_id
+CREATE INDEX IF NOT EXISTS idx_points_ledger_household_id
 ON points_ledger(household_id);
 
-CREATE INDEX idx_points_ledger_household_member_id
+CREATE INDEX IF NOT EXISTS idx_points_ledger_household_member_id
 ON points_ledger(household_member_id);
 
-CREATE INDEX idx_points_ledger_chore_instance_id
+CREATE INDEX IF NOT EXISTS idx_points_ledger_chore_instance_id
 ON points_ledger(chore_instance_id);
 
-CREATE INDEX idx_shop_items_household_id
+CREATE INDEX IF NOT EXISTS idx_shop_items_household_id
 ON shop_items(household_id);
 
-CREATE INDEX idx_shop_purchases_household_id
+CREATE INDEX IF NOT EXISTS idx_shop_purchases_household_id
 ON shop_purchases(household_id);
 
-CREATE INDEX idx_shop_purchases_buyer_member_id
+CREATE INDEX IF NOT EXISTS idx_shop_purchases_buyer_member_id
 ON shop_purchases(buyer_member_id);
 
-CREATE INDEX idx_notifications_household_member_id
+CREATE INDEX IF NOT EXISTS idx_notifications_household_member_id
 ON notifications(household_member_id);
 
-CREATE INDEX idx_notifications_household_member_read
+CREATE INDEX IF NOT EXISTS idx_notifications_household_member_read
 ON notifications(household_id, household_member_id, is_read);

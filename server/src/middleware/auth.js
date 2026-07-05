@@ -93,7 +93,7 @@ function setSessionCookie(res, sessionId) {
     res.cookie(SESSION_COOKIE_NAME, sessionId, {
         httpOnly: true,
         sameSite: "lax",
-        secure: false,
+        secure: process.env.NODE_ENV === "production",
         maxAge: 1000 * 60 * 60 * 24
     });
 }
