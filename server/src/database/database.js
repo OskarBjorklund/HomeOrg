@@ -14,6 +14,23 @@ async function applySchema(database) {
     await database.exec(schema);
 }
 
+// Lägger till en kolumn om den saknas. CREATE TABLE IF NOT EXISTS rör inte
+// befintliga tabeller, så nya kolumner måste migreras in i existerande databaser.
+async function ensureColumn(database, table, column, definition) {
+    const columns = await database.all(`PRAGMA table_info(${table})`);
+
+    if (!columns.some((col) => col.name === column)) {
+        await database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        console.log(`Migration: added column ${table}.${column}`);
+    }
+}
+
+// Enkla additiva migreringar. Ersätts av ett riktigt migrationssystem
+// (versionstabell + migrationsfiler) när schemat börjar ändras oftare.
+async function runMigrations(database) {
+    await ensureColumn(database, "points_ledger", "note", "TEXT");
+}
+
 async function initDatabase() {
     if (db) {
         return db;
@@ -28,6 +45,7 @@ async function initDatabase() {
 
     // Idempotent: skapar tabeller som saknas, rör inte befintlig data.
     await applySchema(db);
+    await runMigrations(db);
 
     console.log("Database connected and schema ensured");
 
@@ -67,6 +85,7 @@ async function resetDatabase() {
     await database.exec(reset);
 
     await applySchema(database);
+    await runMigrations(database);
 
     console.log("Database reset to a clean schema");
 }

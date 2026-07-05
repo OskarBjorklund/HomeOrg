@@ -1,8 +1,23 @@
+const { Roles } = require("../households/constants");
+
 const LedgerReason = {
     CHORE_APPROVED: "chore_approved",
     MANUAL_ADJUSTMENT: "manual_adjustment"
 };
 
+// Roller som får göra manuella poängjusteringar.
+const PointsManagerRoles = [Roles.OWNER, Roles.ADMIN, Roles.ADULT];
+
+const Limits = {
+    ADJUST_MAX: 100000,
+    NOTE_MAX: 200,
+    LEDGER_PAGE_DEFAULT: 50,
+    LEDGER_PAGE_MAX: 100,
+    RECENT_ENTRIES: 10
+};
+
 module.exports = {
-    LedgerReason
+    LedgerReason,
+    PointsManagerRoles,
+    Limits
 };

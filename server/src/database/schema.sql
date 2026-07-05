@@ -313,6 +313,7 @@ CREATE TABLE IF NOT EXISTS points_ledger (
 
     amount INTEGER NOT NULL,
     reason TEXT NOT NULL,
+    note TEXT,
 
     chore_instance_id INTEGER,
     shop_purchase_id INTEGER,
