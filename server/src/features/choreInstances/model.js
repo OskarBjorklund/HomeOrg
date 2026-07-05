@@ -95,6 +95,12 @@ async function getInstancesForHousehold(filters) {
         params.push(filters.status);
     }
 
+    if (filters.statuses && filters.statuses.length > 0) {
+        const placeholders = filters.statuses.map(() => "?").join(", ");
+        conditions.push(`chore_instances.status IN (${placeholders})`);
+        params.push(...filters.statuses);
+    }
+
     if (filters.choreId) {
         conditions.push("chore_instances.chore_id = ?");
         params.push(filters.choreId);
