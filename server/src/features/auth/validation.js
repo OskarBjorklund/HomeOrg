@@ -1,22 +1,20 @@
 const ApiError = require("../../errors/ApiError");
+const { requiredTrimmedString } = require("../../utils/validate");
 
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 30;
 const PASSWORD_MIN_LENGTH = 8;
 const DISPLAY_NAME_MAX_LENGTH = 60;
 
-function requireTrimmedString(value, field) {
-    if (typeof value !== "string" || !value.trim()) {
-        throw new ApiError(400, `${field} is required.`);
-    }
-
-    return value.trim();
-}
-
 function validateRegister(body) {
-    const username = requireTrimmedString(body?.username, "Username");
-    const displayName = requireTrimmedString(body?.displayName, "Display name");
+    const username = requiredTrimmedString(body?.username, "Username");
+    const displayName = requiredTrimmedString(
+        body?.displayName,
+        "Display name",
+        DISPLAY_NAME_MAX_LENGTH
+    );
 
+    // Lösenord trimmas medvetet inte — mellanslag är giltiga tecken.
     if (typeof body?.password !== "string" || body.password.length === 0) {
         throw new ApiError(400, "Password is required.");
     }
@@ -40,18 +38,11 @@ function validateRegister(body) {
         );
     }
 
-    if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
-        throw new ApiError(
-            400,
-            `Display name must be at most ${DISPLAY_NAME_MAX_LENGTH} characters.`
-        );
-    }
-
     return { username, password, displayName };
 }
 
 function validateLogin(body) {
-    const username = requireTrimmedString(body?.username, "Username");
+    const username = requiredTrimmedString(body?.username, "Username");
 
     if (typeof body?.password !== "string" || body.password.length === 0) {
         throw new ApiError(400, "Password is required.");

@@ -1,3 +1,5 @@
+const { DATE_FORMAT } = require("../../utils/validate");
+
 const InstanceStatus = {
     OPEN: "open",
     CLAIMED: "claimed",
@@ -26,8 +28,6 @@ const Limits = {
     // (t.ex. korrupt recurrence-data).
     GENERATION_LOOP_CAP: 1000
 };
-
-const DATE_FORMAT = "YYYY-MM-DD";
 
 module.exports = {
     InstanceStatus,

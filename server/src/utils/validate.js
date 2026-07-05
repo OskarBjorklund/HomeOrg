@@ -43,6 +43,20 @@ function optionalDate(value, field) {
     return requiredDate(value, field);
 }
 
+function requiredTrimmedString(value, field, max) {
+    if (typeof value !== "string" || !value.trim()) {
+        throw new ApiError(400, `${field} is required.`);
+    }
+
+    const trimmed = value.trim();
+
+    if (max !== undefined && trimmed.length > max) {
+        throw new ApiError(400, `${field} must be at most ${max} characters.`);
+    }
+
+    return trimmed;
+}
+
 function optionalTrimmedString(value, field, max) {
     if (value === undefined || value === null) {
         return null;
@@ -99,13 +113,27 @@ function optionalInteger(value, field, { min, max } = {}) {
     return number;
 }
 
+function optionalBoolean(value, field) {
+    if (value === undefined || value === null) {
+        return null;
+    }
+
+    if (typeof value !== "boolean") {
+        throw new ApiError(400, `${field} must be a boolean.`);
+    }
+
+    return value;
+}
+
 module.exports = {
     DATE_FORMAT,
     isPlainObject,
     validateId,
     requiredDate,
     optionalDate,
+    requiredTrimmedString,
     optionalTrimmedString,
     optionalEnum,
-    optionalInteger
+    optionalInteger,
+    optionalBoolean
 };

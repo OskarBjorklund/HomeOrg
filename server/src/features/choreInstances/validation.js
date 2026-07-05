@@ -1,43 +1,13 @@
-const dayjs = require("dayjs");
 const ApiError = require("../../errors/ApiError");
-const { InstanceStatus, Defaults, Limits, DATE_FORMAT } = require("./constants");
-
-function isPlainObject(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function validateId(value, field = "id") {
-    const number = Number(value);
-
-    if (!Number.isInteger(number) || number <= 0) {
-        throw new ApiError(400, `A valid ${field} is required.`);
-    }
-
-    return number;
-}
-
-function requiredDate(value, field) {
-    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        throw new ApiError(400, `${field} must be a date in ${DATE_FORMAT} format.`);
-    }
-
-    const parsed = dayjs(value);
-
-    // Rundturskontrollen fångar ogiltiga datum som 2026-02-31.
-    if (!parsed.isValid() || parsed.format(DATE_FORMAT) !== value) {
-        throw new ApiError(400, `${field} is not a valid date.`);
-    }
-
-    return value;
-}
-
-function optionalDate(value, field) {
-    if (value === undefined || value === null) {
-        return null;
-    }
-
-    return requiredDate(value, field);
-}
+const {
+    isPlainObject,
+    validateId,
+    requiredDate,
+    optionalDate,
+    optionalTrimmedString,
+    optionalEnum
+} = require("../../utils/validate");
+const { InstanceStatus, Defaults, Limits } = require("./constants");
 
 function validateCreateInstance(body) {
     if (!isPlainObject(body)) {
@@ -77,20 +47,12 @@ function validateGenerate(body) {
 
 function validateListFilters(query) {
     const filters = {
-        status: null,
+        status: optionalEnum(query?.status, InstanceStatus, "status filter"),
         choreId: null,
         assignedToMemberId: null,
-        from: null,
-        to: null
+        from: optionalDate(query?.from, "from"),
+        to: optionalDate(query?.to, "to")
     };
-
-    if (query?.status !== undefined && query.status !== "") {
-        if (!Object.values(InstanceStatus).includes(query.status)) {
-            throw new ApiError(400, "Invalid status filter.");
-        }
-
-        filters.status = query.status;
-    }
 
     if (query?.choreId !== undefined && query.choreId !== "") {
         filters.choreId = validateId(query.choreId, "chore id");
@@ -99,9 +61,6 @@ function validateListFilters(query) {
     if (query?.assignedToMemberId !== undefined && query.assignedToMemberId !== "") {
         filters.assignedToMemberId = validateId(query.assignedToMemberId, "member id");
     }
-
-    filters.from = optionalDate(query?.from === "" ? null : query?.from, "from");
-    filters.to = optionalDate(query?.to === "" ? null : query?.to, "to");
 
     return filters;
 }
@@ -132,22 +91,9 @@ function validateUpdateInstance(body) {
 }
 
 function validateReject(body) {
-    let reason = null;
-
-    if (isPlainObject(body) && body.reason !== undefined && body.reason !== null) {
-        if (typeof body.reason !== "string") {
-            throw new ApiError(400, "Reason must be a string.");
-        }
-
-        reason = body.reason.trim() || null;
-
-        if (reason && reason.length > Limits.REJECTION_REASON_MAX) {
-            throw new ApiError(
-                400,
-                `Reason must be at most ${Limits.REJECTION_REASON_MAX} characters.`
-            );
-        }
-    }
+    const reason = isPlainObject(body)
+        ? optionalTrimmedString(body.reason, "Reason", Limits.REJECTION_REASON_MAX)
+        : null;
 
     return { reason };
 }

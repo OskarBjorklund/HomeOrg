@@ -1,5 +1,14 @@
 const ApiError = require("../../errors/ApiError");
 const {
+    isPlainObject,
+    validateId,
+    requiredTrimmedString,
+    optionalTrimmedString,
+    optionalInteger,
+    optionalEnum,
+    optionalBoolean
+} = require("../../utils/validate");
+const {
     RecurrenceType,
     Priority,
     Difficulty,
@@ -7,92 +16,6 @@ const {
     Defaults,
     Limits
 } = require("./constants");
-
-function isPlainObject(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function requiredTrimmedString(value, field, max) {
-    if (typeof value !== "string" || !value.trim()) {
-        throw new ApiError(400, `${field} is required.`);
-    }
-
-    const trimmed = value.trim();
-
-    if (trimmed.length > max) {
-        throw new ApiError(400, `${field} must be at most ${max} characters.`);
-    }
-
-    return trimmed;
-}
-
-function optionalTrimmedString(value, field, max) {
-    if (value === undefined || value === null) {
-        return null;
-    }
-
-    if (typeof value !== "string") {
-        throw new ApiError(400, `${field} must be a string.`);
-    }
-
-    const trimmed = value.trim();
-
-    if (!trimmed) {
-        return null;
-    }
-
-    if (trimmed.length > max) {
-        throw new ApiError(400, `${field} must be at most ${max} characters.`);
-    }
-
-    return trimmed;
-}
-
-function optionalInteger(value, field, { min, max }) {
-    if (value === undefined || value === null) {
-        return null;
-    }
-
-    const number = Number(value);
-
-    if (!Number.isInteger(number)) {
-        throw new ApiError(400, `${field} must be an integer.`);
-    }
-
-    if (min !== undefined && number < min) {
-        throw new ApiError(400, `${field} must be at least ${min}.`);
-    }
-
-    if (max !== undefined && number > max) {
-        throw new ApiError(400, `${field} must be at most ${max}.`);
-    }
-
-    return number;
-}
-
-function optionalEnum(value, allowed, field) {
-    if (value === undefined || value === null) {
-        return null;
-    }
-
-    if (typeof value !== "string" || !Object.values(allowed).includes(value)) {
-        throw new ApiError(400, `Invalid ${field}.`);
-    }
-
-    return value;
-}
-
-function optionalBoolean(value, field) {
-    if (value === undefined || value === null) {
-        return null;
-    }
-
-    if (typeof value !== "boolean") {
-        throw new ApiError(400, `${field} must be a boolean.`);
-    }
-
-    return value;
-}
 
 function normalizeMemberIds(value) {
     if (value === undefined || value === null) {
@@ -114,16 +37,6 @@ function normalizeMemberIds(value) {
     });
 
     return [...new Set(ids)];
-}
-
-function validateId(value, field = "id") {
-    const number = Number(value);
-
-    if (!Number.isInteger(number) || number <= 0) {
-        throw new ApiError(400, `A valid ${field} is required.`);
-    }
-
-    return number;
 }
 
 function validateCreateChore(body) {
@@ -285,11 +198,9 @@ function validateUpdateChore(body) {
 }
 
 function validateListFilters(query) {
-    const filters = {
+    return {
         includeArchived: query?.includeArchived === "true" || query?.includeArchived === true
     };
-
-    return filters;
 }
 
 module.exports = {
