@@ -3,6 +3,7 @@ const cookieParser = require("cookie-parser");
 const authRoutes = require("./features/auth/routes");
 const householdRoutes = require("./features/households/routes");
 const choreRoutes = require("./features/chores/routes");
+const choreInstanceRoutes = require("./features/choreInstances/routes");
 const errorHandler = require("./middleware/errorHandler");
 const { attachUser } = require("./middleware/auth");
 
@@ -17,6 +18,7 @@ app.use(attachUser);
 app.use("/api/auth", authRoutes);
 app.use("/api/households", householdRoutes);
 app.use("/api/chores", choreRoutes);
+app.use("/api/chore-instances", choreInstanceRoutes);
 
 
 app.get("/api/status", (req, res) => {

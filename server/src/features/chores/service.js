@@ -10,6 +10,14 @@ function requireManager(member) {
     }
 }
 
+// Både "specific" och "rotation" använder chore_assignments som pool.
+function usesAssignmentPool(assignmentMode) {
+    return (
+        assignmentMode === AssignmentMode.SPECIFIC ||
+        assignmentMode === AssignmentMode.ROTATION
+    );
+}
+
 async function assertMembersBelongToHousehold(householdId, memberIds) {
     if (!memberIds || memberIds.length === 0) {
         return;
@@ -53,7 +61,7 @@ async function createChore(context, body) {
 
     const data = validation.validateCreateChore(body);
 
-    if (data.assignmentMode === AssignmentMode.SPECIFIC) {
+    if (usesAssignmentPool(data.assignmentMode)) {
         await assertMembersBelongToHousehold(member.household_id, data.assignedMemberIds);
     }
 
@@ -77,7 +85,7 @@ async function createChore(context, body) {
             requiresApproval: data.requiresApproval
         });
 
-        if (data.assignmentMode === AssignmentMode.SPECIFIC && data.assignedMemberIds) {
+        if (usesAssignmentPool(data.assignmentMode) && data.assignedMemberIds) {
             await model.replaceAssignments(created.id, data.assignedMemberIds);
         }
 
@@ -121,8 +129,8 @@ async function updateChore(context, choreId, body) {
     const effectiveMode =
         patch.assignmentMode !== undefined ? patch.assignmentMode : existing.assignmentMode;
 
-    if (assignedMemberIds !== undefined && effectiveMode === AssignmentMode.SPECIFIC) {
-        if (assignedMemberIds.length === 0) {
+    if (assignedMemberIds !== undefined && usesAssignmentPool(effectiveMode)) {
+        if (effectiveMode === AssignmentMode.SPECIFIC && assignedMemberIds.length === 0) {
             throw new ApiError(
                 400,
                 "assignedMemberIds cannot be empty when assignment mode is specific."
@@ -135,8 +143,8 @@ async function updateChore(context, choreId, body) {
     const chore = await withTransaction(async () => {
         const updated = await model.updateChore(id, patch);
 
-        // Assignments gäller bara i läget "specific"; annars nollställs de.
-        if (effectiveMode === AssignmentMode.SPECIFIC) {
+        // Assignments (poolen) gäller bara i "specific"/"rotation"; annars nollställs de.
+        if (usesAssignmentPool(effectiveMode)) {
             if (assignedMemberIds !== undefined) {
                 await model.replaceAssignments(id, assignedMemberIds);
             }
