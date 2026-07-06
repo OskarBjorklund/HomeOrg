@@ -7,6 +7,9 @@ const choreInstanceRoutes = require("./features/choreInstances/routes");
 const dashboardRoutes = require("./features/dashboard/routes");
 const calendarRoutes = require("./features/calendar/routes");
 const pointsRoutes = require("./features/points/routes");
+const leaderboardRoutes = require("./features/leaderboard/routes");
+const shopRoutes = require("./features/shop/routes");
+const inventoryRoutes = require("./features/inventory/routes");
 const errorHandler = require("./middleware/errorHandler");
 const { attachUser } = require("./middleware/auth");
 
@@ -25,6 +28,9 @@ app.use("/api/chore-instances", choreInstanceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/points", pointsRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/shop", shopRoutes);
+app.use("/api/inventory", inventoryRoutes);
 
 
 app.get("/api/status", (req, res) => {

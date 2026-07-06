@@ -337,13 +337,47 @@ CREATE TABLE IF NOT EXISTS points_ledger (
         ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS reward_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    household_id INTEGER NOT NULL,
+
+    title TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    color TEXT,
+
+    default_cost INTEGER NOT NULL DEFAULT 10,
+    default_uses_total INTEGER,
+
+    created_by_user_id INTEGER NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (household_id)
+        REFERENCES households(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (created_by_user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS shop_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
 
     title TEXT NOT NULL,
     description TEXT,
+    icon TEXT,
+    color TEXT,
     cost INTEGER NOT NULL,
+
+    uses_total INTEGER,
+    disappears_after_purchase INTEGER NOT NULL DEFAULT 0,
+    reward_template_id INTEGER,
+
     created_by_user_id INTEGER NOT NULL,
 
     is_active INTEGER NOT NULL DEFAULT 1,
@@ -357,6 +391,25 @@ CREATE TABLE IF NOT EXISTS shop_items (
 
     FOREIGN KEY (created_by_user_id)
         REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (reward_template_id)
+        REFERENCES reward_templates(id)
+        ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS shop_item_visibility (
+    shop_item_id INTEGER NOT NULL,
+    household_member_id INTEGER NOT NULL,
+
+    PRIMARY KEY (shop_item_id, household_member_id),
+
+    FOREIGN KEY (shop_item_id)
+        REFERENCES shop_items(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (household_member_id)
+        REFERENCES household_members(id)
         ON DELETE CASCADE
 );
 
@@ -388,6 +441,40 @@ CREATE TABLE IF NOT EXISTS shop_purchases (
 
     FOREIGN KEY (approved_by_member_id)
         REFERENCES household_members(id)
+        ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    household_id INTEGER NOT NULL,
+    owner_member_id INTEGER NOT NULL,
+    shop_purchase_id INTEGER,
+
+    title TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    color TEXT,
+
+    uses_total INTEGER,
+    uses_left INTEGER,
+    activation_count INTEGER NOT NULL DEFAULT 0,
+    last_activated_at TEXT,
+
+    status TEXT NOT NULL DEFAULT 'active',
+
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (household_id)
+        REFERENCES households(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (owner_member_id)
+        REFERENCES household_members(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (shop_purchase_id)
+        REFERENCES shop_purchases(id)
         ON DELETE SET NULL
 );
 
@@ -481,6 +568,18 @@ ON points_ledger(chore_instance_id);
 
 CREATE INDEX IF NOT EXISTS idx_shop_items_household_id
 ON shop_items(household_id);
+
+CREATE INDEX IF NOT EXISTS idx_reward_templates_household_id
+ON reward_templates(household_id);
+
+CREATE INDEX IF NOT EXISTS idx_shop_item_visibility_member
+ON shop_item_visibility(household_member_id);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_items_owner
+ON inventory_items(owner_member_id);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_items_household_status
+ON inventory_items(household_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_shop_purchases_household_id
 ON shop_purchases(household_id);

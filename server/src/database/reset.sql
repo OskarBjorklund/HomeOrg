@@ -4,8 +4,11 @@
 
 PRAGMA foreign_keys = OFF;
 
+DROP TABLE IF EXISTS inventory_items;
+DROP TABLE IF EXISTS shop_item_visibility;
 DROP TABLE IF EXISTS shop_purchases;
 DROP TABLE IF EXISTS shop_items;
+DROP TABLE IF EXISTS reward_templates;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS points_ledger;
 

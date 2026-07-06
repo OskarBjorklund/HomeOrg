@@ -2,7 +2,8 @@ const { Roles } = require("../households/constants");
 
 const LedgerReason = {
     CHORE_APPROVED: "chore_approved",
-    MANUAL_ADJUSTMENT: "manual_adjustment"
+    MANUAL_ADJUSTMENT: "manual_adjustment",
+    SHOP_PURCHASE: "shop_purchase"
 };
 
 // Roller som får göra manuella poängjusteringar.

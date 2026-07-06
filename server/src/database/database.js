@@ -29,6 +29,22 @@ async function ensureColumn(database, table, column, definition) {
 // (versionstabell + migrationsfiler) när schemat börjar ändras oftare.
 async function runMigrations(database) {
     await ensureColumn(database, "points_ledger", "note", "TEXT");
+
+    await ensureColumn(database, "shop_items", "icon", "TEXT");
+    await ensureColumn(database, "shop_items", "color", "TEXT");
+    await ensureColumn(database, "shop_items", "uses_total", "INTEGER");
+    await ensureColumn(
+        database,
+        "shop_items",
+        "disappears_after_purchase",
+        "INTEGER NOT NULL DEFAULT 0"
+    );
+    await ensureColumn(
+        database,
+        "shop_items",
+        "reward_template_id",
+        "INTEGER REFERENCES reward_templates(id) ON DELETE SET NULL"
+    );
 }
 
 async function initDatabase() {
