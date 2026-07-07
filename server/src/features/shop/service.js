@@ -3,6 +3,7 @@ const validation = require("./validation");
 const choresModel = require("../chores/model");
 const pointsService = require("../points/service");
 const pointsModel = require("../points/model");
+const achievementsService = require("../achievements/service");
 const inventoryModel = require("../inventory/model");
 const ApiError = require("../../errors/ApiError");
 const { withTransaction } = require("../../database/database");
@@ -262,12 +263,17 @@ async function buyItem(context, itemId) {
     const id = validation.validateId(itemId, "shop item id");
     const item = await getOwnedItem(member, id);
 
-    if (!isManager(member)) {
-        const visible = await model.isItemVisibleToMember(id, member.id);
+    // Synlighetslistan gäller ÄVEN managers vid köp: en vara listad "bara för
+    // andra" ska inte kunna köpas av den som lade upp den. Managers kan
+    // fortfarande se och avlista den (403, inte 404 — de vet att den finns).
+    const visible = await model.isItemVisibleToMember(id, member.id);
 
-        if (!visible) {
+    if (!visible) {
+        if (!isManager(member)) {
             throw new ApiError(404, "Shop item not found.");
         }
+
+        throw new ApiError(403, "This item is only available to other members.");
     }
 
     const settings = await model.getShopSettings(member.household_id);
@@ -307,7 +313,8 @@ async function buyItem(context, itemId) {
                 amount: -item.cost,
                 reason: LedgerReason.SHOP_PURCHASE,
                 note: item.title,
-                shopPurchaseId: purchase.id
+                shopPurchaseId: purchase.id,
+                actorMemberId: member.id
             });
         }
 
@@ -326,6 +333,12 @@ async function buyItem(context, itemId) {
         if (item.disappearsAfterPurchase === 1) {
             await model.delistItem(item.id);
         }
+
+        // Köpet kan låsa upp achievements (t.ex. "Första köpet").
+        await achievementsService.syncMemberAchievements({
+            householdId: member.household_id,
+            memberId: member.id
+        });
 
         return { purchase, inventoryItem, balance: newBalance };
     });

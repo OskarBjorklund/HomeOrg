@@ -3,9 +3,16 @@ const model = require("./model");
 const validation = require("./validation");
 const choresModel = require("../chores/model");
 const pointsService = require("../points/service");
+const pointsModel = require("../points/model");
+const achievementsService = require("../achievements/service");
 const ApiError = require("../../errors/ApiError");
 const { withTransaction } = require("../../database/database");
-const { AssignmentMode, RecurrenceType, ChoreManagerRoles } = require("../chores/constants");
+const {
+    AssignmentMode,
+    RecurrenceType,
+    ChoreManagerRoles,
+    Defaults: ChoreDefaults
+} = require("../chores/constants");
 const { LedgerReason } = require("../points/constants");
 const {
     InstanceStatus,
@@ -101,6 +108,54 @@ async function createInstance(context, body) {
             assignedToMemberId: data.assignedToMemberId
         })
     );
+}
+
+// Snabb engångsuppgift ("flytta soffan innan gästerna kommer"): skapar en
+// engångs-template + instans atomärt. Templaten arkiveras direkt så att den
+// inte skräpar ner Sysslor-fliken — instansen snapshot:ar ändå alla värden
+// så historik och poäng fungerar som vanligt.
+async function quickCreateInstance(context, body) {
+    const { user, member } = context;
+
+    requireManager(member);
+
+    const data = validation.validateQuickCreate(body);
+
+    if (data.assignedToMemberId) {
+        await assertMemberInHousehold(member.household_id, data.assignedToMemberId);
+    }
+
+    const dueDate = data.dueDate || dayjs().format(DATE_FORMAT);
+
+    return withTransaction(async () => {
+        const chore = await choresModel.createChore({
+            householdId: member.household_id,
+            createdByUserId: user.id,
+            title: data.title,
+            description: data.description,
+            category: null,
+            icon: null,
+            color: null,
+            points: data.points,
+            difficulty: null,
+            estimatedMinutes: null,
+            recurrenceType: RecurrenceType.NONE,
+            recurrenceInterval: ChoreDefaults.RECURRENCE_INTERVAL,
+            priority: ChoreDefaults.PRIORITY,
+            assignmentMode: AssignmentMode.ANYONE,
+            visibleToChildren: true,
+            requiresApproval: data.requiresApproval
+        });
+
+        await choresModel.setArchived(chore.id, true);
+
+        return model.createInstance(
+            snapshotFromChore(chore, {
+                dueDate,
+                assignedToMemberId: data.assignedToMemberId
+            })
+        );
+    });
 }
 
 function stepDate(date, chore) {
@@ -309,13 +364,10 @@ async function unclaimInstance(context, instanceId) {
     return model.unclaimInstance(id);
 }
 
-// Tilldelad/claimad instans: bara den medlemmen (eller manager) får slutföra.
-// Otilldelad och oclaimad: vem som helst i hushållet.
+// Endast den som är tilldelad uppgiften eller har tagit den får slutföra —
+// INGA undantag, inte ens managers. Poängen ska alltid gå till den som
+// faktiskt gjort jobbet, och "klar" förutsätter att man äger uppgiften.
 function assertCanComplete(member, instance) {
-    if (isManager(member)) {
-        return;
-    }
-
     if (instance.assignedToMemberId) {
         if (instance.assignedToMemberId !== member.id) {
             throw new ApiError(403, "This instance is assigned to another member.");
@@ -324,7 +376,11 @@ function assertCanComplete(member, instance) {
         return;
     }
 
-    if (instance.claimedByMemberId && instance.claimedByMemberId !== member.id) {
+    if (!instance.claimedByMemberId) {
+        throw new ApiError(400, "Claim this instance before completing it.");
+    }
+
+    if (instance.claimedByMemberId !== member.id) {
         throw new ApiError(403, "This instance is claimed by another member.");
     }
 }
@@ -355,9 +411,16 @@ async function completeInstance(context, instanceId) {
                 memberId: member.id,
                 amount: updated.points,
                 reason: LedgerReason.CHORE_APPROVED,
-                choreInstanceId: updated.id
+                choreInstanceId: updated.id,
+                actorMemberId: member.id
             });
         }
+
+        // Godkännandet kan låsa upp achievements — även utan poäng.
+        await achievementsService.syncMemberAchievements({
+            householdId: updated.householdId,
+            memberId: member.id
+        });
 
         return updated;
     });
@@ -384,11 +447,122 @@ async function approveInstance(context, instanceId) {
                 memberId: updated.completedByMemberId,
                 amount: updated.points,
                 reason: LedgerReason.CHORE_APPROVED,
-                choreInstanceId: updated.id
+                choreInstanceId: updated.id,
+                actorMemberId: member.id
+            });
+        }
+
+        // Godkännandet kan låsa upp achievements — även utan poäng.
+        if (updated.completedByMemberId) {
+            await achievementsService.syncMemberAchievements({
+                householdId: updated.householdId,
+                memberId: updated.completedByMemberId
             });
         }
 
         return updated;
+    });
+}
+
+// Ångra en felklickad "klar". Utföraren själv (eller en manager) kan ångra
+// så länge instansen inte godkänts manuellt av en manager — då är det ett
+// managerbeslut och Avvisa är rätt väg. Var instansen auto-godkänd återförs
+// poängen med en kompenserande ledger-rad (saldot förklaras alltid av ledgern).
+async function uncompleteInstance(context, instanceId) {
+    const { member } = context;
+
+    const id = validation.validateId(instanceId, "instance id");
+    const instance = await getOwnedInstance(member, id);
+
+    const undoable =
+        instance.status === InstanceStatus.COMPLETED ||
+        (instance.status === InstanceStatus.APPROVED && !instance.approvedByMemberId);
+
+    if (!undoable) {
+        throw new ApiError(400, "Only completed or auto-approved instances can be undone.");
+    }
+
+    if (instance.completedByMemberId !== member.id && !isManager(member)) {
+        throw new ApiError(403, "Only the member who completed this instance can undo it.");
+    }
+
+    const wasAutoApproved = instance.status === InstanceStatus.APPROVED;
+
+    return withTransaction(async () => {
+        if (wasAutoApproved && instance.points > 0 && instance.completedByMemberId) {
+            const balance = await pointsModel.getBalanceForMember(
+                instance.completedByMemberId
+            );
+
+            if (balance < instance.points) {
+                throw new ApiError(400, "Cannot undo: the points have already been spent.");
+            }
+
+            await pointsService.addPoints({
+                householdId: instance.householdId,
+                memberId: instance.completedByMemberId,
+                amount: -instance.points,
+                reason: LedgerReason.CHORE_UNDONE,
+                note: instance.title,
+                choreInstanceId: instance.id,
+                actorMemberId: member.id
+            });
+        }
+
+        return model.uncompleteInstance(id);
+    });
+}
+
+// Friköp: en uppgift som är tilldelad mig kan köpas bort för dubbla
+// poängvärdet. Uppgiften släpps då fri för vem som helst — med de dubblade
+// poängen som belöning. Nollsumma: friköparen betalar exakt det nästa
+// person tjänar på att göra den.
+async function buyoutInstance(context, instanceId) {
+    const { member } = context;
+
+    const id = validation.validateId(instanceId, "instance id");
+    const instance = await getOwnedInstance(member, id);
+
+    if (instance.status !== InstanceStatus.OPEN) {
+        throw new ApiError(400, "Only open instances can be bought out.");
+    }
+
+    if (instance.assignedToMemberId !== member.id) {
+        throw new ApiError(403, "You can only buy out instances assigned to you.");
+    }
+
+    if (instance.points <= 0) {
+        throw new ApiError(400, "This instance has no points to buy out.");
+    }
+
+    // addPoints är no-op när poäng är avstängda — då skulle friköpet bli
+    // gratis. Kolla explicit i stället.
+    const pointsEnabled = await pointsModel.getPointsEnabled(instance.householdId);
+
+    if (!pointsEnabled) {
+        throw new ApiError(400, "Points are disabled for this household.");
+    }
+
+    const cost = instance.points * 2;
+
+    return withTransaction(async () => {
+        const balance = await pointsModel.getBalanceForMember(member.id);
+
+        if (balance < cost) {
+            throw new ApiError(400, "Insufficient points to buy out this instance.");
+        }
+
+        await pointsService.addPoints({
+            householdId: instance.householdId,
+            memberId: member.id,
+            amount: -cost,
+            reason: LedgerReason.CHORE_BUYOUT,
+            note: instance.title,
+            choreInstanceId: instance.id,
+            actorMemberId: member.id
+        });
+
+        return model.buyoutInstance(id, cost);
     });
 }
 
@@ -448,12 +622,15 @@ async function deleteInstance(context, instanceId) {
 
 module.exports = {
     createInstance,
+    quickCreateInstance,
     generateRecurring,
     getInstances,
     getInstance,
     claimInstance,
     unclaimInstance,
     completeInstance,
+    uncompleteInstance,
+    buyoutInstance,
     approveInstance,
     rejectInstance,
     updateInstance,

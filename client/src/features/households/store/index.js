@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import * as householdsApi from "../api";
 import { useAuthStore } from "../../auth/store";
-import { ManagerRoles } from "../constants";
+import { AdminRoles, ManagerRoles } from "../constants";
 
 export const useHouseholdsStore = defineStore("households", {
     state: () => ({
@@ -21,6 +21,12 @@ export const useHouseholdsStore = defineStore("households", {
 
         isManager() {
             return Boolean(this.myMember && ManagerRoles.includes(this.myMember.role));
+        },
+
+        // Speglar backendens AdminRoles: får administrera settings,
+        // medlemmar och invites.
+        isAdmin() {
+            return Boolean(this.myMember && AdminRoles.includes(this.myMember.role));
         },
 
         membersById(state) {

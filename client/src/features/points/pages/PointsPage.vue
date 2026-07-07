@@ -15,6 +15,8 @@ const info = ref("");
 
 const ReasonLabels = {
     chore_approved: "Syssla",
+    chore_undone: "Ångrad syssla",
+    chore_buyout: "Friköpt syssla",
     manual_adjustment: "Justering",
     shop_purchase: "Köp"
 };
@@ -90,6 +92,20 @@ async function submitAdjust() {
 function formatAmount(amount) {
     return amount > 0 ? `+${amount}` : `${amount}`;
 }
+
+// Visa aktören när den tillför information: alltid för justeringar,
+// annars bara när någon annan än mottagaren orsakade raden (t.ex.
+// managern som godkände sysslan).
+function showActor(entry) {
+    if (!entry.createdByDisplayName) {
+        return false;
+    }
+
+    return (
+        entry.reason === "manual_adjustment" ||
+        entry.createdByMemberId !== entry.memberId
+    );
+}
 </script>
 
 <template>
@@ -133,6 +149,9 @@ function formatAmount(amount) {
                             <strong>{{ entry.choreTitle || entry.note || ReasonLabels[entry.reason] }}</strong>
                             <div class="muted ledger-meta">
                                 {{ entry.memberDisplayName }} · {{ ReasonLabels[entry.reason] }}
+                                <template v-if="showActor(entry)">
+                                    · av {{ entry.createdByDisplayName }}
+                                </template>
                                 <template v-if="entry.note && entry.choreTitle">
                                     · {{ entry.note }}
                                 </template>

@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(requireAuth, requireHousehold);
 
 router.post("/", asyncHandler(controller.createInstance));
+router.post("/quick", asyncHandler(controller.quickCreateInstance));
 router.post("/generate", asyncHandler(controller.generateRecurring));
 router.get("/", asyncHandler(controller.getInstances));
 router.get("/:id", asyncHandler(controller.getInstance));
@@ -17,6 +18,8 @@ router.delete("/:id", asyncHandler(controller.deleteInstance));
 router.post("/:id/claim", asyncHandler(controller.claimInstance));
 router.post("/:id/unclaim", asyncHandler(controller.unclaimInstance));
 router.post("/:id/complete", asyncHandler(controller.completeInstance));
+router.post("/:id/uncomplete", asyncHandler(controller.uncompleteInstance));
+router.post("/:id/buyout", asyncHandler(controller.buyoutInstance));
 router.post("/:id/approve", asyncHandler(controller.approveInstance));
 router.post("/:id/reject", asyncHandler(controller.rejectInstance));
 

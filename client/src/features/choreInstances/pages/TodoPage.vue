@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
+import dayjs from "dayjs";
 import { useChoreInstancesStore } from "../store";
 import { useChoresStore } from "../../chores/store";
 import { useHouseholdsStore } from "../../households/store";
@@ -12,15 +13,42 @@ const households = useHouseholdsStore();
 
 const error = ref("");
 const info = ref("");
-const showCreate = ref(false);
 
-const today = new Date().toISOString().slice(0, 10);
+// null | "quick" | "template" — vilket skapa-formulär som är öppet.
+const openForm = ref(null);
+
+const today = dayjs().format("YYYY-MM-DD");
+const tomorrow = dayjs().add(1, "day").format("YYYY-MM-DD");
 
 const createForm = reactive({
     choreId: "",
     dueDate: today,
     assignedToMemberId: ""
 });
+
+const quickForm = reactive({
+    title: "",
+    points: 10,
+    dueDate: today,
+    assignedToMemberId: ""
+});
+
+// Sidan visar bara idag (inkl. försenat) och imorgon — framtiden bor i
+// kalendern. Store:n hämtar redan bara t.o.m. imorgon.
+const sections = computed(() => [
+    {
+        key: "today",
+        title: "Idag",
+        items: store.instances.filter((instance) => instance.dueDate <= today),
+        emptyText: "Inget att göra idag."
+    },
+    {
+        key: "tomorrow",
+        title: "Imorgon",
+        items: store.instances.filter((instance) => instance.dueDate === tomorrow),
+        emptyText: "Inget planerat imorgon."
+    }
+]);
 
 const myMemberId = computed(() => households.myMember?.id ?? null);
 
@@ -51,6 +79,8 @@ function isOverdue(instance) {
 const canClaim = (instance) => permissions.canClaim(instance);
 const canUnclaim = (instance) => permissions.canUnclaim(instance, permissionContext.value);
 const canComplete = (instance) => permissions.canComplete(instance, permissionContext.value);
+const canUncomplete = (instance) => permissions.canUncomplete(instance, permissionContext.value);
+const canBuyout = (instance) => permissions.canBuyout(instance, permissionContext.value);
 
 async function run(action) {
     error.value = "";
@@ -66,7 +96,25 @@ async function run(action) {
 const claim = (instance) => run(() => store.claim(instance.id));
 const unclaim = (instance) => run(() => store.unclaim(instance.id));
 const complete = (instance) => run(() => store.complete(instance.id));
+const uncomplete = (instance) => run(() => store.uncomplete(instance.id));
 const approve = (instance) => run(() => store.approve(instance.id));
+
+function buyout(instance) {
+    const cost = instance.points * 2;
+
+    if (
+        !window.confirm(
+            `Köp bort "${instance.title}" för ${cost} p? Uppgiften blir fri att ta för ${cost} p.`
+        )
+    ) {
+        return;
+    }
+
+    return run(async () => {
+        await store.buyout(instance.id);
+        info.value = `Uppgiften är friköpt — den ligger nu öppen för ${cost} p.`;
+    });
+}
 
 function reject(instance) {
     const reason = window.prompt("Anledning till avvisning (valfritt):") ?? null;
@@ -103,11 +151,34 @@ function createInstance() {
                 : null
         });
 
-        showCreate.value = false;
+        openForm.value = null;
         createForm.choreId = "";
         createForm.dueDate = today;
         createForm.assignedToMemberId = "";
     });
+}
+
+function createQuick() {
+    return run(async () => {
+        await store.quickCreate({
+            title: quickForm.title,
+            points: Number(quickForm.points),
+            dueDate: quickForm.dueDate,
+            assignedToMemberId: quickForm.assignedToMemberId
+                ? Number(quickForm.assignedToMemberId)
+                : null
+        });
+
+        openForm.value = null;
+        quickForm.title = "";
+        quickForm.points = 10;
+        quickForm.dueDate = today;
+        quickForm.assignedToMemberId = "";
+    });
+}
+
+function toggleForm(name) {
+    openForm.value = openForm.value === name ? null : name;
 }
 
 async function changeFilter() {
@@ -129,8 +200,11 @@ async function changeFilter() {
 
                 <template v-if="households.isManager">
                     <button class="btn btn-ghost" @click="generate">Generera återkommande</button>
-                    <button class="btn btn-primary" @click="showCreate = !showCreate">
-                        {{ showCreate ? "Stäng" : "Ny instans" }}
+                    <button class="btn btn-ghost" @click="toggleForm('template')">
+                        {{ openForm === 'template' ? "Stäng" : "Från mall" }}
+                    </button>
+                    <button class="btn btn-primary" @click="toggleForm('quick')">
+                        {{ openForm === 'quick' ? "Stäng" : "Snabb uppgift" }}
                     </button>
                 </template>
             </div>
@@ -139,7 +213,41 @@ async function changeFilter() {
         <p v-if="error" class="form-error">{{ error }}</p>
         <p v-if="info" class="muted">{{ info }}</p>
 
-        <form v-if="showCreate" class="card create-form" @submit.prevent="createInstance">
+        <form v-if="openForm === 'quick'" class="card create-form" @submit.prevent="createQuick">
+            <label class="field grow">
+                <span>Vad ska göras?</span>
+                <input
+                    v-model="quickForm.title"
+                    type="text"
+                    placeholder="t.ex. Flytta soffan innan gästerna kommer"
+                    required
+                />
+            </label>
+
+            <label class="field">
+                <span>Poäng</span>
+                <input v-model="quickForm.points" type="number" min="0" />
+            </label>
+
+            <label class="field">
+                <span>Datum</span>
+                <input v-model="quickForm.dueDate" type="date" required />
+            </label>
+
+            <label class="field">
+                <span>Tilldela (valfritt)</span>
+                <select v-model="quickForm.assignedToMemberId">
+                    <option value="">Ingen</option>
+                    <option v-for="member in households.members" :key="member.id" :value="member.id">
+                        {{ member.displayName }}
+                    </option>
+                </select>
+            </label>
+
+            <button class="btn btn-primary" type="submit">Skapa</button>
+        </form>
+
+        <form v-if="openForm === 'template'" class="card create-form" @submit.prevent="createInstance">
             <label class="field">
                 <span>Syssla</span>
                 <select v-model="createForm.choreId" required>
@@ -170,73 +278,85 @@ async function changeFilter() {
 
         <div v-if="store.loading" class="muted">Laddar...</div>
 
-        <div v-else-if="store.instances.length" class="instance-list">
-            <div
-                v-for="instance in store.instances"
-                :key="instance.id"
-                class="card instance-card"
-                :class="{ done: instance.status === 'approved' }"
-            >
-                <div class="instance-info">
-                    <div class="instance-title">
-                        <strong>{{ instance.title }}</strong>
-                        <span class="badge">{{ instance.points }} p</span>
-                        <span class="badge status" :class="`status-${instance.status}`">
-                            {{ StatusLabels[instance.status] }}
-                        </span>
-                    </div>
+        <template v-else>
+            <section v-for="section in sections" :key="section.key" class="day-section">
+                <h2 class="day-heading">{{ section.title }}</h2>
 
-                    <div class="instance-meta muted">
-                        <span :class="{ overdue: isOverdue(instance) }">
-                            {{ instance.dueDate }}
-                            <template v-if="isOverdue(instance)">(försenad)</template>
-                        </span>
-
-                        <span v-if="instance.assignedToMemberId">
-                            · Tilldelad: {{ memberName(instance.assignedToMemberId) }}
-                        </span>
-                        <span v-else-if="instance.claimedByMemberId">
-                            · Tagen av: {{ memberName(instance.claimedByMemberId) }}
-                        </span>
-
-                        <span v-if="instance.completedByMemberId">
-                            · Utförd av: {{ memberName(instance.completedByMemberId) }}
-                        </span>
-
-                        <span v-if="instance.status === 'rejected' && instance.rejectionReason">
-                            · Avvisad: "{{ instance.rejectionReason }}"
-                        </span>
-                    </div>
-                </div>
-
-                <div class="instance-actions">
-                    <button v-if="canClaim(instance)" class="btn btn-ghost" @click="claim(instance)">
-                        Ta
-                    </button>
-                    <button v-if="canUnclaim(instance)" class="btn btn-ghost" @click="unclaim(instance)">
-                        Släpp
-                    </button>
-                    <button v-if="canComplete(instance)" class="btn btn-primary" @click="complete(instance)">
-                        Klar
-                    </button>
-
-                    <template v-if="households.isManager && instance.status === 'completed'">
-                        <button class="btn btn-primary" @click="approve(instance)">Godkänn</button>
-                        <button class="btn btn-ghost" @click="reject(instance)">Avvisa</button>
-                    </template>
-
-                    <button
-                        v-if="households.isManager && instance.status !== 'approved'"
-                        class="btn btn-ghost"
-                        @click="removeInstance(instance)"
+                <div v-if="section.items.length" class="instance-list">
+                    <div
+                        v-for="instance in section.items"
+                        :key="instance.id"
+                        class="card instance-card"
+                        :class="{ done: instance.status === 'approved' }"
                     >
-                        Ta bort
-                    </button>
-                </div>
-            </div>
-        </div>
+                        <div class="instance-info">
+                            <div class="instance-title">
+                                <strong>{{ instance.title }}</strong>
+                                <span class="badge">{{ instance.points }} p</span>
+                                <span class="badge status" :class="`status-${instance.status}`">
+                                    {{ StatusLabels[instance.status] }}
+                                </span>
+                            </div>
 
-        <p v-else class="muted">Inga instanser att visa.</p>
+                            <div class="instance-meta muted">
+                                <span :class="{ overdue: isOverdue(instance) }">
+                                    {{ instance.dueDate }}
+                                    <template v-if="isOverdue(instance)">(försenad)</template>
+                                </span>
+
+                                <span v-if="instance.assignedToMemberId">
+                                    · Tilldelad: {{ memberName(instance.assignedToMemberId) }}
+                                </span>
+                                <span v-else-if="instance.claimedByMemberId">
+                                    · Tagen av: {{ memberName(instance.claimedByMemberId) }}
+                                </span>
+
+                                <span v-if="instance.completedByMemberId">
+                                    · Utförd av: {{ memberName(instance.completedByMemberId) }}
+                                </span>
+
+                                <span v-if="instance.status === 'rejected' && instance.rejectionReason">
+                                    · Avvisad: "{{ instance.rejectionReason }}"
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="instance-actions">
+                            <button v-if="canClaim(instance)" class="btn btn-ghost" @click="claim(instance)">
+                                Ta
+                            </button>
+                            <button v-if="canUnclaim(instance)" class="btn btn-ghost" @click="unclaim(instance)">
+                                Släpp
+                            </button>
+                            <button v-if="canComplete(instance)" class="btn btn-primary" @click="complete(instance)">
+                                Klar
+                            </button>
+                            <button v-if="canUncomplete(instance)" class="btn btn-ghost" @click="uncomplete(instance)">
+                                Ångra
+                            </button>
+                            <button v-if="canBuyout(instance)" class="btn btn-ghost" @click="buyout(instance)">
+                                Köp bort ({{ instance.points * 2 }} p)
+                            </button>
+
+                            <template v-if="households.isManager && instance.status === 'completed'">
+                                <button class="btn btn-primary" @click="approve(instance)">Godkänn</button>
+                                <button class="btn btn-ghost" @click="reject(instance)">Avvisa</button>
+                            </template>
+
+                            <button
+                                v-if="households.isManager && instance.status !== 'approved'"
+                                class="btn btn-ghost"
+                                @click="removeInstance(instance)"
+                            >
+                                Ta bort
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <p v-else class="muted">{{ section.emptyText }}</p>
+            </section>
+        </template>
     </div>
 </template>
 
@@ -272,6 +392,22 @@ async function changeFilter() {
     padding: 1.25rem;
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
+}
+
+.create-form .grow {
+    flex: 1;
+    min-width: 220px;
+}
+
+.day-section {
+    margin-bottom: 1.75rem;
+}
+
+.day-heading {
+    font-size: 1.05rem;
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid var(--color-border);
 }
 
 .instance-list {

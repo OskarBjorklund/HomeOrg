@@ -293,6 +293,42 @@ async function rejectInstance(id, rejecterMemberId, reason) {
     return getInstanceById(id);
 }
 
+// Ångra en "klar": tillbaka till claimed (om någon höll i uppgiften) eller
+// open. Nollställer både completion- och approval-fälten.
+async function uncompleteInstance(id) {
+    const db = getDatabase();
+
+    await db.run(
+        `UPDATE chore_instances
+         SET status = CASE WHEN claimed_by_member_id IS NULL THEN ? ELSE ? END,
+             completed_by_member_id = NULL,
+             completed_at = NULL,
+             approved_by_member_id = NULL,
+             approved_at = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [InstanceStatus.OPEN, InstanceStatus.CLAIMED, id]
+    );
+
+    return getInstanceById(id);
+}
+
+// Friköp: uppgiften släpps fri (otilldelad) med nya, dubblade poäng.
+async function buyoutInstance(id, newPoints) {
+    const db = getDatabase();
+
+    await db.run(
+        `UPDATE chore_instances
+         SET points = ?,
+             assigned_to_member_id = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [newPoints, id]
+    );
+
+    return getInstanceById(id);
+}
+
 async function updateInstanceFields(id, patch) {
     const db = getDatabase();
 
@@ -348,6 +384,8 @@ module.exports = {
     markCompletedAndApproved,
     approveInstance,
     rejectInstance,
+    uncompleteInstance,
+    buyoutInstance,
     updateInstanceFields,
     deleteInstance
 };

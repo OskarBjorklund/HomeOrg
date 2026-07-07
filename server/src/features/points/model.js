@@ -8,14 +8,18 @@ const LEDGER_COLUMNS = `
     points_ledger.note,
     points_ledger.chore_instance_id AS choreInstanceId,
     points_ledger.shop_purchase_id AS shopPurchaseId,
+    points_ledger.created_by_member_id AS createdByMemberId,
     points_ledger.created_at AS createdAt,
     COALESCE(household_members.display_name, users.display_name) AS memberDisplayName,
+    COALESCE(actors.display_name, actor_users.display_name) AS createdByDisplayName,
     chore_instances.title AS choreTitle
 `;
 
 const LEDGER_JOINS = `
     JOIN household_members ON household_members.id = points_ledger.household_member_id
     LEFT JOIN users ON users.id = household_members.user_id
+    LEFT JOIN household_members AS actors ON actors.id = points_ledger.created_by_member_id
+    LEFT JOIN users AS actor_users ON actor_users.id = actors.user_id
     LEFT JOIN chore_instances ON chore_instances.id = points_ledger.chore_instance_id
 `;
 
@@ -53,7 +57,8 @@ async function insertLedgerEntry({
     reason,
     note = null,
     choreInstanceId = null,
-    shopPurchaseId = null
+    shopPurchaseId = null,
+    createdByMemberId = null
 }) {
     const db = getDatabase();
 
@@ -65,9 +70,19 @@ async function insertLedgerEntry({
             reason,
             note,
             chore_instance_id,
-            shop_purchase_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [householdId, memberId, amount, reason, note, choreInstanceId, shopPurchaseId]
+            shop_purchase_id,
+            created_by_member_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            householdId,
+            memberId,
+            amount,
+            reason,
+            note,
+            choreInstanceId,
+            shopPurchaseId,
+            createdByMemberId
+        ]
     );
 
     return result.lastID;

@@ -20,7 +20,6 @@ export const DifficultyOptions = [
 ];
 
 export const AssignmentModeOptions = [
-    { value: "unassigned", label: "Otilldelad" },
     { value: "anyone", label: "Vem som helst" },
     { value: "specific", label: "Specifika medlemmar" },
     { value: "rotation", label: "Rotation" }

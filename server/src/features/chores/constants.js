@@ -20,10 +20,11 @@ const Difficulty = {
     HARD: "hard"
 };
 
+// "unassigned" togs bort — den var funktionellt identisk med "anyone".
+// Befintliga rader migreras vid serverstart (database.js).
 const AssignmentMode = {
-    UNASSIGNED: "unassigned",
-    SPECIFIC: "specific",
     ANYONE: "anyone",
+    SPECIFIC: "specific",
     ROTATION: "rotation"
 };
 
@@ -32,7 +33,7 @@ const Defaults = {
     RECURRENCE_INTERVAL: 1,
     PRIORITY: Priority.NORMAL,
     RECURRENCE_TYPE: RecurrenceType.NONE,
-    ASSIGNMENT_MODE: AssignmentMode.UNASSIGNED,
+    ASSIGNMENT_MODE: AssignmentMode.ANYONE,
     VISIBLE_TO_CHILDREN: true,
     REQUIRES_APPROVAL: false
 };

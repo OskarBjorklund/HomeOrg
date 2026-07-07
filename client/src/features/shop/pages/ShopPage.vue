@@ -12,7 +12,6 @@ const balance = ref(null);
 const error = ref("");
 const info = ref("");
 const showForm = ref(false);
-const showPresets = ref(false);
 const showPurchases = ref(false);
 
 function emptyForm() {
@@ -157,12 +156,29 @@ function removeItem(item) {
     return run(() => store.deleteItem(item.id));
 }
 
-function removePreset(preset) {
-    if (!window.confirm(`Ta bort presetet "${preset.title}"?`)) {
+// Raderar presetet som är valt i formuläret och återgår till "Skapa helt ny".
+function removeSelectedPreset() {
+    const preset = store.presets.find((p) => p.id === Number(form.presetId));
+
+    if (!preset || !window.confirm(`Ta bort presetet "${preset.title}"?`)) {
         return;
     }
 
-    return run(() => store.deletePreset(preset.id));
+    return run(async () => {
+        await store.deletePreset(preset.id);
+        Object.assign(form, emptyForm());
+        info.value = `Presetet "${preset.title}" är borttaget.`;
+    });
+}
+
+// En vara med synlighetslista kan bara köpas av dem som står i den —
+// det gäller även managern som lade upp den (backend blockerar med 403).
+function canBuy(item) {
+    if (!item.visibleToMemberIds || item.visibleToMemberIds.length === 0) {
+        return true;
+    }
+
+    return item.visibleToMemberIds.includes(households.myMember?.id);
 }
 
 function visibilityLabel(item) {
@@ -184,14 +200,13 @@ function visibilityLabel(item) {
             <div class="page-actions">
                 <span v-if="balance !== null" class="balance-chip">{{ balance }} p</span>
 
-                <template v-if="households.isManager">
-                    <button class="btn btn-ghost" @click="showPresets = !showPresets">
-                        Presets
-                    </button>
-                    <button class="btn btn-primary" @click="showForm = !showForm">
-                        {{ showForm ? "Stäng" : "Ny vara" }}
-                    </button>
-                </template>
+                <button
+                    v-if="households.isManager"
+                    class="btn btn-primary"
+                    @click="showForm = !showForm"
+                >
+                    {{ showForm ? "Stäng" : "Ny vara" }}
+                </button>
             </div>
         </div>
 
@@ -202,15 +217,26 @@ function visibilityLabel(item) {
             <h2>Ny vara</h2>
 
             <div class="form-grid">
-                <label class="field span-2">
+                <div class="field span-2">
                     <span>Utgå från preset</span>
-                    <select v-model="form.presetId">
-                        <option value="">Skapa helt ny</option>
-                        <option v-for="preset in store.presets" :key="preset.id" :value="preset.id">
-                            {{ preset.title }} ({{ preset.defaultCost }} p)
-                        </option>
-                    </select>
-                </label>
+                    <div class="preset-row">
+                        <select v-model="form.presetId">
+                            <option value="">Skapa helt ny</option>
+                            <option v-for="preset in store.presets" :key="preset.id" :value="preset.id">
+                                {{ preset.title }} ({{ preset.defaultCost }} p)
+                            </option>
+                        </select>
+
+                        <button
+                            v-if="usingPreset"
+                            class="btn btn-ghost"
+                            type="button"
+                            @click="removeSelectedPreset"
+                        >
+                            Radera preset
+                        </button>
+                    </div>
+                </div>
 
                 <label class="field span-2">
                     <span>Titel</span>
@@ -282,22 +308,6 @@ function visibilityLabel(item) {
             </div>
         </form>
 
-        <div v-if="showPresets && households.isManager" class="card section-card">
-            <h2>Sparade presets</h2>
-
-            <ul v-if="store.presets.length" class="row-list">
-                <li v-for="preset in store.presets" :key="preset.id">
-                    <span>
-                        <strong>{{ preset.title }}</strong>
-                        <span class="badge">{{ preset.defaultCost }} p</span>
-                        <span class="badge">{{ usesLabel(preset.defaultUsesTotal) }}</span>
-                    </span>
-                    <button class="btn btn-ghost" @click="removePreset(preset)">Ta bort</button>
-                </li>
-            </ul>
-            <p v-else class="muted">Inga presets sparade.</p>
-        </div>
-
         <div v-if="store.loading" class="muted">Laddar...</div>
 
         <div v-else-if="store.items.length" class="item-grid">
@@ -320,12 +330,14 @@ function visibilityLabel(item) {
 
                 <div class="shop-item-actions">
                     <button
+                        v-if="canBuy(item)"
                         class="btn btn-primary"
                         :disabled="balance !== null && balance < item.cost"
                         @click="buy(item)"
                     >
                         Köp
                     </button>
+                    <span v-else class="muted">Endast för andra medlemmar</span>
                     <button
                         v-if="households.isManager"
                         class="btn btn-ghost"
@@ -418,6 +430,16 @@ function visibilityLabel(item) {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.95rem;
+}
+
+.preset-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.preset-row select {
+    flex: 1;
 }
 
 .member-picker {

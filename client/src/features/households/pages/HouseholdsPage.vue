@@ -73,13 +73,23 @@ function joinHousehold() {
                     </p>
                 </div>
 
-                <button
-                    class="btn"
-                    :class="auth.user?.householdId === household.id ? 'btn-ghost' : 'btn-primary'"
-                    @click="selectHousehold(household.id)"
-                >
-                    {{ auth.user?.householdId === household.id ? "Aktivt" : "Välj" }}
-                </button>
+                <div class="household-card-actions">
+                    <RouterLink
+                        v-if="auth.user?.householdId === household.id"
+                        class="btn btn-ghost"
+                        :to="{ name: 'household-admin' }"
+                    >
+                        Hantera
+                    </RouterLink>
+
+                    <button
+                        class="btn"
+                        :class="auth.user?.householdId === household.id ? 'btn-ghost' : 'btn-primary'"
+                        @click="selectHousehold(household.id)"
+                    >
+                        {{ auth.user?.householdId === household.id ? "Aktivt" : "Välj" }}
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -130,6 +140,11 @@ function joinHousehold() {
     justify-content: space-between;
     gap: 1rem;
     padding: 1rem 1.25rem;
+}
+
+.household-card-actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
 .household-actions {

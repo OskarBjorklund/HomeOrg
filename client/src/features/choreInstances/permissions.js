@@ -14,24 +14,42 @@ export function canUnclaim(instance, { myMemberId, isManager }) {
     );
 }
 
-export function canComplete(instance, { myMemberId, isManager }) {
+// Endast tilldelad eller den som tagit uppgiften får slutföra — inga
+// undantag, inte ens managers (annars kan de ge sig själva poäng för
+// arbete de inte gjort). Speglar backend-regeln.
+export function canComplete(instance, { myMemberId }) {
     if (!CompletableStatuses.includes(instance.status)) {
         return false;
-    }
-
-    if (isManager) {
-        return true;
     }
 
     if (instance.assignedToMemberId) {
         return instance.assignedToMemberId === myMemberId;
     }
 
-    if (instance.claimedByMemberId) {
-        return instance.claimedByMemberId === myMemberId;
+    return instance.claimedByMemberId === myMemberId;
+}
+
+// Ångra en felklickad "klar": utföraren eller manager, så länge instansen
+// inte godkänts manuellt av en manager (då är Avvisa rätt väg).
+export function canUncomplete(instance, { myMemberId, isManager }) {
+    const undoable =
+        instance.status === InstanceStatus.COMPLETED ||
+        (instance.status === InstanceStatus.APPROVED && !instance.approvedByMemberId);
+
+    if (!undoable) {
+        return false;
     }
 
-    return true;
+    return instance.completedByMemberId === myMemberId || isManager;
+}
+
+// Friköp: öppen uppgift som är tilldelad mig, mot dubbla poängvärdet.
+export function canBuyout(instance, { myMemberId }) {
+    return (
+        instance.status === InstanceStatus.OPEN &&
+        instance.assignedToMemberId === myMemberId &&
+        instance.points > 0
+    );
 }
 
 export function canApprove(instance, { isManager }) {

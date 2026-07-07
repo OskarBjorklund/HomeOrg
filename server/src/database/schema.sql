@@ -171,7 +171,7 @@ CREATE TABLE IF NOT EXISTS chores (
     recurrence_interval INTEGER NOT NULL DEFAULT 1,
 
     priority TEXT NOT NULL DEFAULT 'normal',
-    assignment_mode TEXT NOT NULL DEFAULT 'unassigned',
+    assignment_mode TEXT NOT NULL DEFAULT 'anyone',
 
     visible_to_children INTEGER NOT NULL DEFAULT 1,
     requires_approval INTEGER NOT NULL DEFAULT 0,
@@ -318,6 +318,10 @@ CREATE TABLE IF NOT EXISTS points_ledger (
     chore_instance_id INTEGER,
     shop_purchase_id INTEGER,
 
+    -- Vem som orsakade raden (godkännaren, justeraren, köparen) — kan skilja
+    -- sig från household_member_id som är mottagaren.
+    created_by_member_id INTEGER,
+
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (household_id)
@@ -334,6 +338,10 @@ CREATE TABLE IF NOT EXISTS points_ledger (
 
     FOREIGN KEY (shop_purchase_id)
         REFERENCES shop_purchases(id)
+        ON DELETE SET NULL,
+
+    FOREIGN KEY (created_by_member_id)
+        REFERENCES household_members(id)
         ON DELETE SET NULL
 );
 
@@ -478,6 +486,29 @@ CREATE TABLE IF NOT EXISTS inventory_items (
         ON DELETE SET NULL
 );
 
+-- Upplåsta achievements per medlem. Katalogen av achievements (nycklar,
+-- titlar, trösklar) definieras i kod (features/achievements/definitions.js) —
+-- tabellen lagrar bara faktumet att en medlem låst upp en av dem.
+CREATE TABLE IF NOT EXISTS member_achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    household_id INTEGER NOT NULL,
+    household_member_id INTEGER NOT NULL,
+
+    achievement_key TEXT NOT NULL,
+
+    unlocked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (household_member_id, achievement_key),
+
+    FOREIGN KEY (household_id)
+        REFERENCES households(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (household_member_id)
+        REFERENCES household_members(id)
+        ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     household_id INTEGER NOT NULL,
@@ -586,6 +617,12 @@ ON shop_purchases(household_id);
 
 CREATE INDEX IF NOT EXISTS idx_shop_purchases_buyer_member_id
 ON shop_purchases(buyer_member_id);
+
+CREATE INDEX IF NOT EXISTS idx_member_achievements_member
+ON member_achievements(household_member_id);
+
+CREATE INDEX IF NOT EXISTS idx_member_achievements_household
+ON member_achievements(household_id);
 
 CREATE INDEX IF NOT EXISTS idx_notifications_household_member_id
 ON notifications(household_member_id);

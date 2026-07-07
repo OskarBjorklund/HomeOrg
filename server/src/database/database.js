@@ -45,6 +45,19 @@ async function runMigrations(database) {
         "reward_template_id",
         "INTEGER REFERENCES reward_templates(id) ON DELETE SET NULL"
     );
+
+    await ensureColumn(
+        database,
+        "points_ledger",
+        "created_by_member_id",
+        "INTEGER REFERENCES household_members(id) ON DELETE SET NULL"
+    );
+
+    // "unassigned" och "anyone" var funktionellt identiska — sammanslagna
+    // till "anyone". Idempotent datamigrering för befintliga databaser.
+    await database.exec(
+        `UPDATE chores SET assignment_mode = 'anyone' WHERE assignment_mode = 'unassigned'`
+    );
 }
 
 async function initDatabase() {

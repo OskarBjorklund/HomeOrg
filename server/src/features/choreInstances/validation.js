@@ -4,10 +4,17 @@ const {
     validateId,
     requiredDate,
     optionalDate,
+    requiredTrimmedString,
     optionalTrimmedString,
-    optionalEnum
+    optionalEnum,
+    optionalInteger,
+    optionalBoolean
 } = require("../../utils/validate");
 const { InstanceStatus, Defaults, Limits } = require("./constants");
+const {
+    Limits: ChoreLimits,
+    Defaults: ChoreDefaults
+} = require("../chores/constants");
 
 function validateCreateInstance(body) {
     if (!isPlainObject(body)) {
@@ -24,6 +31,45 @@ function validateCreateInstance(body) {
     }
 
     return { choreId, dueDate, assignedToMemberId };
+}
+
+// Snabb engångsuppgift: title räcker — resten har vettiga defaults.
+// Skapar chore-template + instans i ett svep (se service.quickCreateInstance).
+function validateQuickCreate(body) {
+    if (!isPlainObject(body)) {
+        throw new ApiError(400, "Request body is required.");
+    }
+
+    const title = requiredTrimmedString(body.title, "Title", ChoreLimits.TITLE_MAX);
+    const description = optionalTrimmedString(
+        body.description,
+        "Description",
+        ChoreLimits.DESCRIPTION_MAX
+    );
+
+    const points = optionalInteger(body.points, "Points", {
+        min: 0,
+        max: ChoreLimits.POINTS_MAX
+    });
+
+    const dueDate = optionalDate(body.dueDate, "Due date");
+
+    let assignedToMemberId = null;
+
+    if (body.assignedToMemberId !== undefined && body.assignedToMemberId !== null) {
+        assignedToMemberId = validateId(body.assignedToMemberId, "member id");
+    }
+
+    const requiresApproval = optionalBoolean(body.requiresApproval, "requiresApproval");
+
+    return {
+        title,
+        description,
+        points: points === null ? ChoreDefaults.POINTS : points,
+        dueDate,
+        assignedToMemberId,
+        requiresApproval: requiresApproval === null ? false : requiresApproval
+    };
 }
 
 function validateGenerate(body) {
@@ -101,6 +147,7 @@ function validateReject(body) {
 module.exports = {
     validateId,
     validateCreateInstance,
+    validateQuickCreate,
     validateGenerate,
     validateListFilters,
     validateUpdateInstance,

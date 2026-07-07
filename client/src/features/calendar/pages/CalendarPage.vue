@@ -19,6 +19,45 @@ const selectedDate = ref(dayjs().format(DATE_FORMAT));
 const loading = ref(false);
 const error = ref("");
 
+// Personfilter: tom lista = visa alla (inkl. projektioner). Med filter visas
+// bara instanser kopplade till valda medlemmar — projektioner tillhör ingen
+// ännu och döljs.
+const selectedMemberIds = ref([]);
+
+function toggleMember(memberId) {
+    const index = selectedMemberIds.value.indexOf(memberId);
+
+    if (index === -1) {
+        selectedMemberIds.value.push(memberId);
+    } else {
+        selectedMemberIds.value.splice(index, 1);
+    }
+}
+
+function showAll() {
+    selectedMemberIds.value = [];
+}
+
+function itemMatchesFilter(item) {
+    if (selectedMemberIds.value.length === 0) {
+        return true;
+    }
+
+    if (item.type === "projection") {
+        return false;
+    }
+
+    return [
+        item.assignedToMemberId,
+        item.claimedByMemberId,
+        item.completedByMemberId
+    ].some((memberId) => memberId && selectedMemberIds.value.includes(memberId));
+}
+
+function itemsForDate(date) {
+    return (dayMap.value.get(date) || []).filter(itemMatchesFilter);
+}
+
 const today = dayjs().format(DATE_FORMAT);
 
 // Rutnätet börjar på måndagen i veckan där månaden startar (6 veckor = 42 dagar).
@@ -38,7 +77,7 @@ const gridDays = computed(() =>
             dayNumber: date.date(),
             inMonth: date.month() === currentMonth.value.month(),
             isToday: key === today,
-            items: dayMap.value.get(key) || []
+            items: itemsForDate(key)
         };
     })
 );
@@ -49,7 +88,7 @@ const monthLabel = computed(() => {
     return label.charAt(0).toUpperCase() + label.slice(1);
 });
 
-const selectedItems = computed(() => dayMap.value.get(selectedDate.value) || []);
+const selectedItems = computed(() => itemsForDate(selectedDate.value));
 
 const permissionContext = computed(() => ({
     myMemberId: households.myMember?.id ?? null,
@@ -134,7 +173,22 @@ const materialize = (item) =>
 const claim = (item) => run(() => instancesApi.claimInstance(item.id));
 const unclaim = (item) => run(() => instancesApi.unclaimInstance(item.id));
 const complete = (item) => run(() => instancesApi.completeInstance(item.id));
+const uncomplete = (item) => run(() => instancesApi.uncompleteInstance(item.id));
 const approve = (item) => run(() => instancesApi.approveInstance(item.id));
+
+function buyout(item) {
+    const cost = item.points * 2;
+
+    if (
+        !window.confirm(
+            `Köp bort "${item.title}" för ${cost} p? Uppgiften blir fri att ta för ${cost} p.`
+        )
+    ) {
+        return;
+    }
+
+    return run(() => instancesApi.buyoutInstance(item.id));
+}
 
 function reject(item) {
     const reason = window.prompt("Anledning till avvisning (valfritt):") ?? null;
@@ -149,6 +203,8 @@ function reject(item) {
 const canClaim = (item) => permissions.canClaim(item);
 const canUnclaim = (item) => permissions.canUnclaim(item, permissionContext.value);
 const canComplete = (item) => permissions.canComplete(item, permissionContext.value);
+const canUncomplete = (item) => permissions.canUncomplete(item, permissionContext.value);
+const canBuyout = (item) => permissions.canBuyout(item, permissionContext.value);
 const canApprove = (item) => permissions.canApprove(item, permissionContext.value);
 </script>
 
@@ -166,6 +222,30 @@ const canApprove = (item) => permissions.canApprove(item, permissionContext.valu
         </div>
 
         <p v-if="error" class="form-error">{{ error }}</p>
+
+        <div class="member-filter">
+            <button
+                class="chip-btn"
+                :class="{ active: selectedMemberIds.length === 0 }"
+                @click="showAll"
+            >
+                Alla
+            </button>
+
+            <button
+                v-for="member in households.members"
+                :key="member.id"
+                class="chip-btn"
+                :class="{ active: selectedMemberIds.includes(member.id) }"
+                @click="toggleMember(member.id)"
+            >
+                {{ member.displayName }}
+            </button>
+
+            <span v-if="selectedMemberIds.length" class="muted filter-note">
+                Planerade (ej tilldelade) förekomster visas bara under "Alla".
+            </span>
+        </div>
 
         <div class="card calendar-grid" :class="{ loading }">
             <div v-for="weekday in WEEKDAYS" :key="weekday" class="weekday-head">
@@ -250,6 +330,12 @@ const canApprove = (item) => permissions.canApprove(item, permissionContext.valu
                             <button v-if="canComplete(item)" class="btn btn-primary" @click="complete(item)">
                                 Klar
                             </button>
+                            <button v-if="canUncomplete(item)" class="btn btn-ghost" @click="uncomplete(item)">
+                                Ångra
+                            </button>
+                            <button v-if="canBuyout(item)" class="btn btn-ghost" @click="buyout(item)">
+                                Köp bort ({{ item.points * 2 }} p)
+                            </button>
                             <template v-if="canApprove(item)">
                                 <button class="btn btn-primary" @click="approve(item)">Godkänn</button>
                                 <button class="btn btn-ghost" @click="reject(item)">Avvisa</button>
@@ -286,6 +372,34 @@ const canApprove = (item) => permissions.canApprove(item, permissionContext.valu
 .month-label {
     min-width: 10rem;
     text-align: center;
+}
+
+.member-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.chip-btn {
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.chip-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.filter-note {
+    font-size: 0.8rem;
 }
 
 .calendar-grid {

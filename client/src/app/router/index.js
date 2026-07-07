@@ -8,6 +8,7 @@ import choreInstanceRoutes from "../../features/choreInstances/routes";
 import shopRoutes from "../../features/shop/routes";
 import inventoryRoutes from "../../features/inventory/routes";
 import pointsRoutes from "../../features/points/routes";
+import achievementRoutes from "../../features/achievements/routes";
 import calendarRoutes from "../../features/calendar/routes";
 
 const router = createRouter({
@@ -21,6 +22,7 @@ const router = createRouter({
         ...shopRoutes,
         ...inventoryRoutes,
         ...pointsRoutes,
+        ...achievementRoutes,
         ...calendarRoutes,
         {
             path: "/:pathMatch(.*)*",

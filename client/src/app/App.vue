@@ -24,6 +24,7 @@ async function logout() {
                 <RouterLink :to="{ name: 'shop' }">Shop</RouterLink>
                 <RouterLink :to="{ name: 'inventory' }">Mina saker</RouterLink>
                 <RouterLink :to="{ name: 'points' }">Poäng</RouterLink>
+                <RouterLink :to="{ name: 'achievements' }">Utmärkelser</RouterLink>
                 <RouterLink :to="{ name: 'households' }">Hushåll</RouterLink>
             </nav>
 

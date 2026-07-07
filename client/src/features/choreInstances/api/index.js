@@ -8,6 +8,11 @@ export function createInstance({ choreId, dueDate, assignedToMemberId }) {
     return http.post("/chore-instances", { choreId, dueDate, assignedToMemberId });
 }
 
+// Snabb engångsuppgift: skapar dold engångsmall + instans i ett svep.
+export function quickCreateInstance(payload) {
+    return http.post("/chore-instances/quick", payload);
+}
+
 export function generateRecurring(daysAhead) {
     return http.post("/chore-instances/generate", daysAhead ? { daysAhead } : {});
 }
@@ -22,6 +27,14 @@ export function unclaimInstance(id) {
 
 export function completeInstance(id) {
     return http.post(`/chore-instances/${id}/complete`);
+}
+
+export function uncompleteInstance(id) {
+    return http.post(`/chore-instances/${id}/uncomplete`);
+}
+
+export function buyoutInstance(id) {
+    return http.post(`/chore-instances/${id}/buyout`);
 }
 
 export function approveInstance(id) {

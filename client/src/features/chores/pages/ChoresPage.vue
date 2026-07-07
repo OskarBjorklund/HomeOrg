@@ -33,7 +33,7 @@ function emptyForm() {
         estimatedMinutes: "",
         requiresApproval: false,
         visibleToChildren: true,
-        assignmentMode: "unassigned",
+        assignmentMode: "anyone",
         assignedMemberIds: []
     };
 }

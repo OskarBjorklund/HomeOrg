@@ -1,5 +1,6 @@
 const model = require("./model");
 const validation = require("./validation");
+const achievementsService = require("../achievements/service");
 const ApiError = require("../../errors/ApiError");
 const { withTransaction } = require("../../database/database");
 const { LedgerReason, PointsManagerRoles, Limits } = require("./constants");
@@ -26,7 +27,8 @@ async function addPoints({
     reason,
     note = null,
     choreInstanceId = null,
-    shopPurchaseId = null
+    shopPurchaseId = null,
+    actorMemberId = null
 }) {
     if (!Number.isInteger(amount) || amount === 0) {
         throw new ApiError(400, "Points amount must be a non-zero integer.");
@@ -49,7 +51,8 @@ async function addPoints({
         reason,
         note,
         choreInstanceId,
-        shopPurchaseId
+        shopPurchaseId,
+        createdByMemberId: actorMemberId
     });
 
     await model.addToMemberBalance(memberId, amount);
@@ -94,8 +97,18 @@ async function adjustPoints(context, body) {
             memberId,
             amount,
             reason: LedgerReason.MANUAL_ADJUSTMENT,
-            note
+            note,
+            actorMemberId: member.id
         });
+
+        // Positiva justeringar räknas som intjänat och kan låsa upp
+        // poäng-achievements.
+        if (amount > 0) {
+            await achievementsService.syncMemberAchievements({
+                householdId: member.household_id,
+                memberId
+            });
+        }
 
         return { memberId, amount, note, balance };
     });

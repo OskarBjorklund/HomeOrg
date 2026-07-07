@@ -8,6 +8,7 @@ const dashboardRoutes = require("./features/dashboard/routes");
 const calendarRoutes = require("./features/calendar/routes");
 const pointsRoutes = require("./features/points/routes");
 const leaderboardRoutes = require("./features/leaderboard/routes");
+const achievementRoutes = require("./features/achievements/routes");
 const shopRoutes = require("./features/shop/routes");
 const inventoryRoutes = require("./features/inventory/routes");
 const errorHandler = require("./middleware/errorHandler");
@@ -29,6 +30,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/points", pointsRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/achievements", achievementRoutes);
 app.use("/api/shop", shopRoutes);
 app.use("/api/inventory", inventoryRoutes);
 

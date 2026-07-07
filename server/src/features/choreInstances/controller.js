@@ -19,6 +19,37 @@ async function createInstance(req, res) {
     );
 }
 
+async function uncompleteInstance(req, res) {
+    const instance = await service.uncompleteInstance(getContext(req), req.params.id);
+
+    return response.success(
+        res,
+        { instance },
+        "Completion undone"
+    );
+}
+
+async function buyoutInstance(req, res) {
+    const instance = await service.buyoutInstance(getContext(req), req.params.id);
+
+    return response.success(
+        res,
+        { instance },
+        "Instance bought out"
+    );
+}
+
+async function quickCreateInstance(req, res) {
+    const instance = await service.quickCreateInstance(getContext(req), req.body);
+
+    return response.success(
+        res,
+        { instance },
+        "Quick task created",
+        201
+    );
+}
+
 async function generateRecurring(req, res) {
     const result = await service.generateRecurring(getContext(req), req.body);
 
@@ -119,6 +150,9 @@ async function deleteInstance(req, res) {
 
 module.exports = {
     createInstance,
+    quickCreateInstance,
+    uncompleteInstance,
+    buyoutInstance,
     generateRecurring,
     getInstances,
     getInstance,

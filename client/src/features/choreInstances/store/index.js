@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import dayjs from "dayjs";
 import * as instancesApi from "../api";
 
 export const useChoreInstancesStore = defineStore("choreInstances", {
@@ -9,11 +10,15 @@ export const useChoreInstancesStore = defineStore("choreInstances", {
     }),
 
     actions: {
+        // Att göra-sidan visar bara till och med imorgon — framtiden bor i
+        // kalendern. Försenade instanser kommer med (ingen from-gräns).
         async fetch() {
             this.loading = true;
 
             try {
-                const params = {};
+                const params = {
+                    to: dayjs().add(1, "day").format("YYYY-MM-DD")
+                };
 
                 if (this.statusFilter) {
                     params.status = this.statusFilter;
@@ -51,6 +56,16 @@ export const useChoreInstancesStore = defineStore("choreInstances", {
             this.replaceInstance(instance);
         },
 
+        async uncomplete(id) {
+            const { instance } = await instancesApi.uncompleteInstance(id);
+            this.replaceInstance(instance);
+        },
+
+        async buyout(id) {
+            const { instance } = await instancesApi.buyoutInstance(id);
+            this.replaceInstance(instance);
+        },
+
         async approve(id) {
             const { instance } = await instancesApi.approveInstance(id);
             this.replaceInstance(instance);
@@ -63,6 +78,11 @@ export const useChoreInstancesStore = defineStore("choreInstances", {
 
         async create(payload) {
             await instancesApi.createInstance(payload);
+            await this.fetch();
+        },
+
+        async quickCreate(payload) {
+            await instancesApi.quickCreateInstance(payload);
             await this.fetch();
         },
 
