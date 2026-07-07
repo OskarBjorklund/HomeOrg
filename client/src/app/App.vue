@@ -18,6 +18,12 @@ async function logout() {
 
             <nav class="app-nav">
                 <RouterLink :to="{ name: 'home' }">Översikt</RouterLink>
+                <RouterLink :to="{ name: 'todo' }">Att göra</RouterLink>
+                <RouterLink :to="{ name: 'calendar' }">Kalender</RouterLink>
+                <RouterLink :to="{ name: 'chores' }">Sysslor</RouterLink>
+                <RouterLink :to="{ name: 'shop' }">Shop</RouterLink>
+                <RouterLink :to="{ name: 'inventory' }">Mina saker</RouterLink>
+                <RouterLink :to="{ name: 'points' }">Poäng</RouterLink>
                 <RouterLink :to="{ name: 'households' }">Hushåll</RouterLink>
             </nav>
 

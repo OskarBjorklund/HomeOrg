@@ -5,13 +5,15 @@
             "name": "backend",
             "runtimeExecutable": "node",
             "runtimeArgs": ["server/src/server.js"],
-            "port": 3000
+            "port": 3000,
+            "autoPort": false
         },
         {
             "name": "client",
             "runtimeExecutable": "npm",
             "runtimeArgs": ["run", "dev", "--prefix", "client"],
-            "port": 5173
+            "port": 5173,
+            "autoPort": false
         }
     ]
 }

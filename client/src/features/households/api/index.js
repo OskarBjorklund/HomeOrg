@@ -19,3 +19,7 @@ export function join(inviteCode) {
 export function createInvite({ householdId, role }) {
     return http.post("/households/invites", { householdId, role });
 }
+
+export function getMembers() {
+    return http.get("/households/members");
+}

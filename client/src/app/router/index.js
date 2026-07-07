@@ -3,6 +3,12 @@ import { useAuthStore } from "../../features/auth/store";
 import authRoutes from "../../features/auth/routes";
 import householdRoutes from "../../features/households/routes";
 import dashboardRoutes from "../../features/dashboard/routes";
+import choreRoutes from "../../features/chores/routes";
+import choreInstanceRoutes from "../../features/choreInstances/routes";
+import shopRoutes from "../../features/shop/routes";
+import inventoryRoutes from "../../features/inventory/routes";
+import pointsRoutes from "../../features/points/routes";
+import calendarRoutes from "../../features/calendar/routes";
 
 const router = createRouter({
     history: createWebHistory(),
@@ -10,6 +16,12 @@ const router = createRouter({
         ...authRoutes,
         ...householdRoutes,
         ...dashboardRoutes,
+        ...choreRoutes,
+        ...choreInstanceRoutes,
+        ...shopRoutes,
+        ...inventoryRoutes,
+        ...pointsRoutes,
+        ...calendarRoutes,
         {
             path: "/:pathMatch(.*)*",
             redirect: { name: "home" }
