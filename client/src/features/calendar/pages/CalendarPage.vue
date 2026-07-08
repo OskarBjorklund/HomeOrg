@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import dayjs from "dayjs";
+import { useToday } from "../../../shared/composables/useToday";
 import * as calendarApi from "../api";
 import * as instancesApi from "../../choreInstances/api";
 import * as permissions from "../../choreInstances/permissions";
@@ -58,7 +59,9 @@ function itemsForDate(date) {
     return (dayMap.value.get(date) || []).filter(itemMatchesFilter);
 }
 
-const today = dayjs().format(DATE_FORMAT);
+// Reaktivt "idag" — flyttar idag-ringen och projektionerna vid midnatt
+// i stället för att frysa vid sidladdningen.
+const today = useToday();
 
 // Rutnätet börjar på måndagen i veckan där månaden startar (6 veckor = 42 dagar).
 const gridStart = computed(() => {
@@ -76,7 +79,7 @@ const gridDays = computed(() =>
             key,
             dayNumber: date.date(),
             inMonth: date.month() === currentMonth.value.month(),
-            isToday: key === today,
+            isToday: key === today.value,
             items: itemsForDate(key)
         };
     })
@@ -115,6 +118,9 @@ async function fetchCalendar() {
 
 watch(currentMonth, fetchCalendar);
 
+// Nytt dygn: hämta om — backend flyttar projektionsgränsen ("från idag").
+watch(today, fetchCalendar);
+
 onMounted(async () => {
     try {
         await households.fetchMembers();
@@ -135,7 +141,7 @@ function nextMonth() {
 
 function goToToday() {
     currentMonth.value = dayjs().startOf("month");
-    selectedDate.value = today;
+    selectedDate.value = today.value;
 }
 
 function selectDay(day) {

@@ -1,18 +1,25 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+import { useToday } from "../../../shared/composables/useToday";
 import { getDashboard } from "../api";
 
+const today = useToday();
 const dashboard = ref(null);
 const error = ref("");
 
-onMounted(async () => {
+async function fetchDashboard() {
     try {
         const data = await getDashboard();
         dashboard.value = data.dashboard;
     } catch (err) {
         error.value = err.message;
     }
-});
+}
+
+onMounted(fetchDashboard);
+
+// Nytt dygn: "idag"-statistiken gäller ett nytt datum — hämta om.
+watch(today, fetchDashboard);
 </script>
 
 <template>

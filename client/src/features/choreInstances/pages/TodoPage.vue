@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import dayjs from "dayjs";
+import { useToday } from "../../../shared/composables/useToday";
 import { useChoreInstancesStore } from "../store";
 import { useChoresStore } from "../../chores/store";
 import { useHouseholdsStore } from "../../households/store";
@@ -17,19 +18,21 @@ const info = ref("");
 // null | "quick" | "template" — vilket skapa-formulär som är öppet.
 const openForm = ref(null);
 
-const today = dayjs().format("YYYY-MM-DD");
-const tomorrow = dayjs().add(1, "day").format("YYYY-MM-DD");
+// Reaktivt "idag" — uppdateras vid midnatt och när fliken får fokus,
+// så att en långlivad flik inte fastnar på gårdagens datum.
+const today = useToday();
+const tomorrow = computed(() => dayjs(today.value).add(1, "day").format("YYYY-MM-DD"));
 
 const createForm = reactive({
     choreId: "",
-    dueDate: today,
+    dueDate: today.value,
     assignedToMemberId: ""
 });
 
 const quickForm = reactive({
     title: "",
     points: 10,
-    dueDate: today,
+    dueDate: today.value,
     assignedToMemberId: ""
 });
 
@@ -39,16 +42,32 @@ const sections = computed(() => [
     {
         key: "today",
         title: "Idag",
-        items: store.instances.filter((instance) => instance.dueDate <= today),
+        items: store.instances.filter((instance) => instance.dueDate <= today.value),
         emptyText: "Inget att göra idag."
     },
     {
         key: "tomorrow",
         title: "Imorgon",
-        items: store.instances.filter((instance) => instance.dueDate === tomorrow),
+        items: store.instances.filter((instance) => instance.dueDate === tomorrow.value),
         emptyText: "Inget planerat imorgon."
     }
 ]);
+
+// Nytt dygn: hämta om listan (store:ns to-gräns flyttas) och flytta fram
+// formulärens datumförslag från gårdagen.
+watch(today, (newToday, oldToday) => {
+    if (createForm.dueDate === oldToday) {
+        createForm.dueDate = newToday;
+    }
+
+    if (quickForm.dueDate === oldToday) {
+        quickForm.dueDate = newToday;
+    }
+
+    store.fetch().catch((err) => {
+        error.value = err.message;
+    });
+});
 
 const myMemberId = computed(() => households.myMember?.id ?? null);
 
@@ -71,7 +90,7 @@ function memberName(memberId) {
 
 function isOverdue(instance) {
     return (
-        instance.dueDate < today &&
+        instance.dueDate < today.value &&
         CompletableStatuses.includes(instance.status)
     );
 }
@@ -153,7 +172,7 @@ function createInstance() {
 
         openForm.value = null;
         createForm.choreId = "";
-        createForm.dueDate = today;
+        createForm.dueDate = today.value;
         createForm.assignedToMemberId = "";
     });
 }
@@ -172,7 +191,7 @@ function createQuick() {
         openForm.value = null;
         quickForm.title = "";
         quickForm.points = 10;
-        quickForm.dueDate = today;
+        quickForm.dueDate = today.value;
         quickForm.assignedToMemberId = "";
     });
 }
